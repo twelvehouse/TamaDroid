@@ -1,0 +1,5 @@
+# Tamagotchi ROMs are copyrighted (Bandai). Keep LOCAL, never commit.
+*.txt
+*.bin
+*.h
+rom.inc

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Base theme; Compose drives the actual UI styling. -->
+    <style name="Theme.TamaDroid" parent="android:Theme.Material.NoActionBar" />
+
+    <!-- Splash screen (AndroidX core-splashscreen). Background matches the icon art. -->
+    <style name="Theme.TamaDroid.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/splash_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_foreground</item>
+        <item name="postSplashScreenTheme">@style/Theme.TamaDroid</item>
+    </style>
+</resources>

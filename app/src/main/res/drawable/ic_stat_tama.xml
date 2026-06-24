@@ -1,0 +1,11 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="#FFFFFF">
+    <!-- Simple egg silhouette for the status bar. -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M12,2C8.7,2 6,7 6,12.5C6,17.7 8.7,21 12,21C15.3,21 18,17.7 18,12.5C18,7 15.3,2 12,2Z" />
+</vector>

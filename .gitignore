@@ -1,0 +1,30 @@
+# --- Android / Gradle ---
+.gradle/
+.kotlin/
+build/
+/local.properties
+*.iml
+.idea/
+*.apk
+*.aab
+.cxx/
+captures/
+
+# --- Serena (local agent memories/cache; may contain local machine paths) ---
+.serena/
+
+# --- Misc local junk ---
+*.stackdump
+
+# --- Reference material (third-party repos kept locally; not redistributed here) ---
+/reference/
+
+# --- ROMs (Bandai copyright) — never commit ---
+/roms/*.txt
+/roms/*.bin
+/roms/*.h
+rom.inc
+
+# --- OS ---
+Thumbs.db
+.DS_Store
