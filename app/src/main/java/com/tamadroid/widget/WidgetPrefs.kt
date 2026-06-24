@@ -15,8 +15,16 @@ object WidgetPrefs {
     private const val K_ALPHA = "alpha"
     private const val K_FX = "fx"
     private const val K_CUSTOM = "custom_presets"
+    private const val K_PACKED = "packed"
 
     private fun p(ctx: Context) = ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+
+    /** Packed dots (no gap) vs spaced dots. Default packed. */
+    fun packed(ctx: Context): Boolean = p(ctx).getBoolean(K_PACKED, true)
+    fun setPacked(ctx: Context, on: Boolean) {
+        p(ctx).edit().putBoolean(K_PACKED, on).apply()
+        TamaWidgetProvider.refreshFromStore(ctx)
+    }
 
     fun effect(ctx: Context): LcdEffect =
         runCatching { LcdEffect.valueOf(p(ctx).getString(K_FX, LcdEffect.NONE.name)!!) }

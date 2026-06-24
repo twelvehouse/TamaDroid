@@ -199,6 +199,7 @@ private fun LcdSection() {
     val ctx = LocalContext.current
     var glow by remember { mutableStateOf(AppPrefs.effect(ctx) == LcdEffect.GLOW) }
     var vsync by remember { mutableStateOf(AppPrefs.inAppVsync(ctx)) }
+    var packed by remember { mutableStateOf(AppPrefs.lcdPacked(ctx)) }
     var theme by remember { mutableStateOf(AppPrefs.lcdTheme(ctx)) }
     var custom by remember { mutableStateOf(AppPrefs.lcdCustomPresets(ctx)) }
 
@@ -211,12 +212,14 @@ private fun LcdSection() {
                 frame.fb, frame.icons, bgRes,
                 if (glow) LcdEffect.GLOW else LcdEffect.NONE,
                 dotColor = theme.dot,
+                packed = packed,
                 modifier = Modifier.fillMaxHeight()
             )
         }
     }
 
     GlowToggle(glow) { glow = it; AppPrefs.setEffect(ctx, if (it) LcdEffect.GLOW else LcdEffect.NONE) }
+    SwitchRow("Packed dots", packed) { packed = it; AppPrefs.setLcdPacked(ctx, it) }
     VsyncToggle(vsync) { vsync = it; AppPrefs.setInAppVsync(ctx, it); TamaRuntime.setVsync(it) }
 
     ThemeControls(
@@ -234,6 +237,7 @@ private fun WidgetSection() {
     val ctx = LocalContext.current
     var theme by remember { mutableStateOf(WidgetPrefs.theme(ctx)) }
     var glow by remember { mutableStateOf(WidgetPrefs.effect(ctx) == LcdEffect.GLOW) }
+    var packed by remember { mutableStateOf(WidgetPrefs.packed(ctx)) }
     var customName by remember { mutableStateOf("") }
     var custom by remember { mutableStateOf(WidgetPrefs.customPresets(ctx)) }
 
@@ -243,12 +247,13 @@ private fun WidgetSection() {
     val flow = TamaRuntime.frame
     val liveFrame = if (flow != null) flow.collectAsStateWithLifecycle().value else null
     val sampleFb = liveFrame?.fb ?: ByteArray(TamaCore.FRAME_BYTES)
-    val preview = remember(theme, fx, sampleFb.contentHashCode()) {
-        WidgetRenderer.render(theme, fx, sampleFb).asImageBitmap()
+    val preview = remember(theme, fx, packed, sampleFb.contentHashCode()) {
+        WidgetRenderer.render(theme, fx, sampleFb, packed).asImageBitmap()
     }
     Image(preview, "preview", modifier = Modifier.fillMaxWidth().heightIn(max = 150.dp))
 
     GlowToggle(glow) { glow = it; WidgetPrefs.setEffect(ctx, if (it) LcdEffect.GLOW else LcdEffect.NONE) }
+    SwitchRow("Packed dots", packed) { packed = it; WidgetPrefs.setPacked(ctx, it) }
 
     ThemeControls(
         theme = theme,
@@ -349,9 +354,12 @@ private fun RomSection(onChangeRom: () -> Unit) {
 }
 
 @Composable
-private fun GlowToggle(checked: Boolean, onChange: (Boolean) -> Unit) {
+private fun GlowToggle(checked: Boolean, onChange: (Boolean) -> Unit) = SwitchRow("Glow effect", checked, onChange)
+
+@Composable
+private fun SwitchRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("Glow effect", style = MaterialTheme.typography.titleMedium)
+        Text(label, style = MaterialTheme.typography.titleMedium)
         Switch(checked = checked, onCheckedChange = onChange)
     }
 }

@@ -16,7 +16,10 @@ enum class LcdEffect { NONE, GLOW, LCD, VHS }
  * coherent frame — no shader baking needed, applied per cached frame).
  */
 object LcdFx {
-    private const val GAP = 0.10f
+    /** Visible inter-dot gap (fraction of cell pitch, each side). */
+    const val GAP_SPACED = 0.10f   // distinct dots
+    const val GAP_PACKED = 0.0f    // dots fill the cell (close, like the real LCD)
+    fun gap(packed: Boolean) = if (packed) GAP_PACKED else GAP_SPACED
 
     fun draw(
         canvas: Canvas,
@@ -26,9 +29,10 @@ object LcdFx {
         pitch: Float,
         dotColor: Int,
         effect: LcdEffect,
+        gap: Float = GAP_SPACED,
     ) {
-        val inset = pitch * GAP
-        val size = pitch * (1 - 2 * GAP)
+        val inset = pitch * gap
+        val size = pitch * (1 - 2 * gap)
         val w = TamaCore.LCD_WIDTH * pitch
         val h = TamaCore.LCD_HEIGHT * pitch
 

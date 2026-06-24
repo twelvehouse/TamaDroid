@@ -13,6 +13,7 @@ object AppPrefs {
     private const val K_BG = "inapp_bg"
     private const val K_FX = "inapp_fx"
     private const val K_VSYNC = "inapp_vsync"
+    private const val K_LCD_PACKED = "lcd_packed"
     private const val K_LCD_DOT = "lcd_dot"
     private const val K_LCD_CUSTOM = "lcd_custom"
     private const val K_PLAY_BG = "play_bg_color"
@@ -62,6 +63,10 @@ object AppPrefs {
 
     fun inAppVsync(ctx: Context): Boolean = p(ctx).getBoolean(K_VSYNC, false)
     fun setInAppVsync(ctx: Context, on: Boolean) { p(ctx).edit().putBoolean(K_VSYNC, on).apply() }
+
+    /** Packed dots (no gap, close like the real LCD) vs spaced dots. Default packed. */
+    fun lcdPacked(ctx: Context): Boolean = p(ctx).getBoolean(K_LCD_PACKED, true)
+    fun setLcdPacked(ctx: Context, on: Boolean) { p(ctx).edit().putBoolean(K_LCD_PACKED, on).apply() }
 
     // ---- In-app LCD theme: only the dot color is used (the frame is the bg image). ----
     fun lcdDot(ctx: Context): Int = p(ctx).getInt(K_LCD_DOT, DEFAULT_LCD_DOT)

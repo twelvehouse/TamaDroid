@@ -74,11 +74,17 @@ class TamaService : Service() {
         observing = true
         val flow = TamaRuntime.frame ?: return
         scope.launch {
-            var prev = false
+            // The attention icon BLINKS while the pet is calling, so a naive rising-edge
+            // check fires postCall (and replays the alert sound) on every blink. Debounce:
+            // treat continuous blinking as one call and notify once. A genuinely new call
+            // (icon quiet for longer than NEW_CALL_GAP_MS) alerts again.
+            var lastOn = 0L
             flow.collect { f ->
-                val calling = f.icons.getOrNull(ATTENTION_ICON)?.toInt() != 0
-                if (calling && !prev) TamaNotifications.postCall(this@TamaService)
-                prev = calling
+                if (f.icons.getOrNull(ATTENTION_ICON)?.toInt() != 0) {
+                    val now = System.currentTimeMillis()
+                    if (now - lastOn > NEW_CALL_GAP_MS) TamaNotifications.postCall(this@TamaService)
+                    lastOn = now
+                }
             }
         }
     }
@@ -92,6 +98,7 @@ class TamaService : Service() {
 
     companion object {
         private const val ATTENTION_ICON = 7   // icon8 = attention/call (Pebble special-cases this)
+        private const val NEW_CALL_GAP_MS = 5000L   // quiet gap before the call icon counts as a new call
         private const val WIDGET_REFRESH_MS = 500L   // fixed; Vsync keeps frames coherent
 
         fun start(ctx: Context) {

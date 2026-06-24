@@ -29,18 +29,15 @@ private const val CANVAS_H = 168f
 private const val LCD_X = 8f
 private const val LCD_Y = 51f
 private const val DOT_PITCH = 4f
-private const val ICONS_LAYER_Y = 24f
 private const val ICON_W = 22f
 private const val ICON_H = 18f
 private const val LCD_ON = 0xFF1B2410.toInt()
-// Fine-tuned vs the real device: top row +1.5 LCD dots down, bottom row -0.5 dot up
-// (1 dot == DOT_PITCH canvas units).
-private const val TOP_ICON_DY = 1.5f * DOT_PITCH
-private const val BOTTOM_ICON_DY = -0.5f * DOT_PITCH
+// Icon row Y positions on the 144x168 device canvas, measured against the real device.
+private const val ICON_TOP_Y = 28f
+private const val ICON_BOTTOM_Y = 122f
 
 private fun iconSlotX(i: Int) = 12f + (i % 4) * 32f
-private fun iconSlotY(i: Int) =
-    ICONS_LAYER_Y + if (i > 3) 100f + BOTTOM_ICON_DY else TOP_ICON_DY
+private fun iconSlotY(i: Int) = if (i > 3) ICON_BOTTOM_Y else ICON_TOP_Y
 
 /** Maps the device-frame setting to a drawable. */
 fun backgroundDrawable(bg: com.tamadroid.data.AppPrefs.Background): Int = when (bg) {
@@ -57,6 +54,7 @@ fun TamaScreen(
     dotColor: Int = LCD_ON,
     allIcons: Boolean = false,
     guideColor: androidx.compose.ui.graphics.Color? = null,
+    packed: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     val bg = if (bgRes != null) ImageBitmap.imageResource(bgRes) else null
@@ -87,7 +85,7 @@ fun TamaScreen(
         }
 
         drawIntoCanvas { canvas ->
-            LcdFx.draw(canvas.nativeCanvas, fb, LCD_X * s, LCD_Y * s, DOT_PITCH * s, dotColor or (0xFF shl 24), effect)
+            LcdFx.draw(canvas.nativeCanvas, fb, LCD_X * s, LCD_Y * s, DOT_PITCH * s, dotColor or (0xFF shl 24), effect, LcdFx.gap(packed))
         }
 
         for (i in 0 until TamaCore.ICON_NUM) {

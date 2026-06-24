@@ -55,7 +55,7 @@ class TamaWidgetProvider : AppWidgetProvider() {
             if (fb != null) {
                 views.setImageViewBitmap(
                     R.id.widget_lcd,
-                    WidgetRenderer.render(WidgetPrefs.theme(context), WidgetPrefs.effect(context), fb)
+                    WidgetRenderer.render(WidgetPrefs.theme(context), WidgetPrefs.effect(context), fb, WidgetPrefs.packed(context))
                 )
             }
             val open = PendingIntent.getActivity(
@@ -96,7 +96,7 @@ object WidgetRenderer {
     private const val SCALE = 16
     private const val RADIUS = SCALE * 2f      // corner radius == vertical margin
 
-    fun render(theme: WidgetTheme, effect: LcdEffect, fb: ByteArray): Bitmap {
+    fun render(theme: WidgetTheme, effect: LcdEffect, fb: ByteArray, packed: Boolean = true): Bitmap {
         val w = TamaCore.LCD_WIDTH * SCALE
         val lcdH = TamaCore.LCD_HEIGHT * SCALE
         val vMargin = RADIUS.toInt()
@@ -110,7 +110,7 @@ object WidgetRenderer {
         }
         c.drawRoundRect(0f, 0f, w.toFloat(), h.toFloat(), RADIUS, RADIUS, bgPaint)
 
-        LcdFx.draw(c, fb, 0f, vMargin.toFloat(), SCALE.toFloat(), theme.dot or (0xFF shl 24), effect)
+        LcdFx.draw(c, fb, 0f, vMargin.toFloat(), SCALE.toFloat(), theme.dot or (0xFF shl 24), effect, LcdFx.gap(packed))
         return bmp
     }
 }

@@ -225,6 +225,7 @@ private fun EmulatorScreen(onOpenSettings: () -> Unit) {
     val dark = isSystemInDarkTheme()
     val effect = AppPrefs.effect(ctx)
     val dotColor = AppPrefs.lcdDot(ctx)
+    val packed = AppPrefs.lcdPacked(ctx)
     val playBg = AppPrefs.playBgColor(ctx, dark)
     val buttonColor = AppPrefs.playButtonColor(ctx, dark)
     val playImage = AppPrefs.playImage(ctx)
@@ -254,7 +255,7 @@ private fun EmulatorScreen(onOpenSettings: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             if (frame != null) {
-                TamaScreen(frame.fb, frame.icons, bgRes, effect, dotColor, modifier = Modifier.fillMaxWidth())
+                TamaScreen(frame.fb, frame.icons, bgRes, effect, dotColor, packed = packed, modifier = Modifier.fillMaxWidth())
             }
             Row(
                 modifier = Modifier.fillMaxWidth(),
