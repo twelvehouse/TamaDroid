@@ -8,9 +8,6 @@ An Android **Tamagotchi (P1/P2) emulator** — app **and** a home-screen widget 
 powered by [TamaLib](https://github.com/jcrona/tamalib) (jcrona) via the Android NDK.
 The pet is rendered in an authentic LCD style and lives in real time.
 
-> Derived from the OpenErgo keyboard project (the idea of an OLED Tamagotchi on a
-> keyboard); split out so the Android version can ship independently.
-
 ## Features
 - **Emulation** — TamaLib (C, GPLv2) reused *unmodified* through an NDK/JNI bridge,
   so the verified emulator core is never re-ported. Runs P1 and P2 ROMs.
