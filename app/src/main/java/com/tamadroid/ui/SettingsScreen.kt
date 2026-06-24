@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -61,15 +62,18 @@ import com.tamadroid.widget.WidgetPrefs
 import com.tamadroid.widget.WidgetRenderer
 import com.tamadroid.widget.WidgetTheme
 import com.tamadroid.widget.WidgetThemes
+import kotlin.math.roundToInt
 
 private val TABS = listOf("App", "LCD", "Widget", "Game")
 
 @Composable
 fun SettingsScreen(onBack: () -> Unit, onChangeRom: () -> Unit, onEditImage: () -> Unit) {
     var tab by remember { mutableIntStateOf(0) }
-    Column(modifier = Modifier.fillMaxSize()) {
+    // Edge-to-edge is on, so inset the whole screen below the status bar — otherwise the
+    // ← Back row collides with it on devices with a tall status bar / notch.
+    Column(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(8.dp)) {
-            TextButton(onClick = onBack) { Text("← Back") }
+            TextButton(onClick = onBack) { Text("Back") }
             Text("Settings", style = MaterialTheme.typography.titleLarge)
         }
         TabRow(selectedTabIndex = tab) {
@@ -103,6 +107,7 @@ private fun PlaySection(onEditImage: () -> Unit) {
     val dark = isSystemInDarkTheme()
     var bgColor by remember { mutableStateOf(AppPrefs.playBgColor(ctx, dark)) }
     var btnColor by remember { mutableStateOf(AppPrefs.playButtonColor(ctx, dark)) }
+    var btnAlpha by remember { mutableStateOf(AppPrefs.playButtonAlpha(ctx)) }
     var frameBg by remember { mutableStateOf(AppPrefs.background(ctx)) }
     var hasImage by remember { mutableStateOf(AppPrefs.hasPlayImage(ctx)) }
 
@@ -123,6 +128,7 @@ private fun PlaySection(onEditImage: () -> Unit) {
         AppPrefs.Background.entries.forEach { b ->
             FilterChip(
                 selected = frameBg == b,
+                enabled = !hasImage,   // a custom image hides the frame, so the choice is moot
                 onClick = { frameBg = b; AppPrefs.setBackground(ctx, b) },
                 label = { Text(if (b == AppPrefs.Background.BASALT) "Color" else "Mono") }
             )
@@ -142,6 +148,9 @@ private fun PlaySection(onEditImage: () -> Unit) {
 
     ColorSwatchButton("Background color", bgColor) { bgColor = it; AppPrefs.setPlayBgColor(ctx, it) }
     ColorSwatchButton("Button color", btnColor) { btnColor = it; AppPrefs.setPlayButtonColor(ctx, it) }
+    OpacitySlider("Button opacity", btnAlpha) { btnAlpha = it; AppPrefs.setPlayButtonAlpha(ctx, it) }
+
+    OutlinedButton(onClick = onEditImage) { Text("Edit button layout") }
 }
 
 @Composable
@@ -157,22 +166,21 @@ private fun GameSection() {
         valueRange = AppPrefs.MIN_SPEED.toFloat()..AppPrefs.MAX_SPEED.toFloat(),
         steps = (AppPrefs.MAX_SPEED - AppPrefs.MIN_SPEED - 1)
     )
-    Text("1x = real time. Higher = the pet lives faster.", style = MaterialTheme.typography.bodySmall)
 
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("Vibration", style = MaterialTheme.typography.titleMedium)
+        Text("Haptic feedback", style = MaterialTheme.typography.titleMedium)
         Switch(checked = vibrate, onCheckedChange = { vibrate = it; AppPrefs.setVibrate(ctx, it) })
     }
-    Text("Short haptic feedback when you press A/B/C.", style = MaterialTheme.typography.bodySmall)
+    Text("Short haptic feedback when you press the buttons.", style = MaterialTheme.typography.bodySmall)
 }
 
 @Composable
 private fun ResetSection(onResetComplete: () -> Unit) {
     val ctx = LocalContext.current
     var confirm by remember { mutableStateOf(false) }
-    Text("Reset", style = MaterialTheme.typography.titleMedium)
+    Text("Reset settings", style = MaterialTheme.typography.titleMedium)
     Text("Restores all settings to their defaults. Your pet and ROM are kept.")
-    OutlinedButton(onClick = { confirm = true }) { Text("Reset settings") }
+    OutlinedButton(onClick = { confirm = true }) { Text("Reset") }
 
     if (confirm) {
         AlertDialog(
@@ -279,8 +287,6 @@ private fun ThemeControls(
     onSaveCustom: (WidgetTheme) -> Unit,
     onRemoveCustom: (String) -> Unit,
 ) {
-    var customName by remember { mutableStateOf("") }
-
     Text("Presets", style = MaterialTheme.typography.titleMedium)
     Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -299,18 +305,31 @@ private fun ThemeControls(
     }
 
     if (showBgOpacity) {
-        Text("Background opacity: ${theme.alpha}", style = MaterialTheme.typography.titleMedium)
-        Slider(theme.alpha.toFloat(), { onApply(theme.copy(alpha = it.toInt())) }, valueRange = 0f..255f)
+        OpacitySlider("Background opacity", theme.alpha) { onApply(theme.copy(alpha = it)) }
         ColorSwatchButton("Background color", theme.bg) { onApply(theme.copy(bg = it)) }
     }
     ColorSwatchButton("Dot color", theme.dot) { onApply(theme.copy(dot = it)) }
 
-    Text("Save as custom preset", style = MaterialTheme.typography.titleMedium)
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-        OutlinedTextField(customName, { customName = it }, label = { Text("Name") }, modifier = Modifier.weight(1f))
-        Button(enabled = customName.isNotBlank(), onClick = {
-            onSaveCustom(theme.copy(name = customName.trim())); customName = ""
-        }) { Text("Save") }
+    var showSaveDialog by remember { mutableStateOf(false) }
+    OutlinedButton(onClick = { showSaveDialog = true }) { Text("Save as custom preset") }
+    if (showSaveDialog) {
+        var customName by remember { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { showSaveDialog = false },
+            title = { Text("Save preset") },
+            text = {
+                OutlinedTextField(
+                    customName, { customName = it },
+                    label = { Text("Name") }, singleLine = true
+                )
+            },
+            confirmButton = {
+                TextButton(enabled = customName.isNotBlank(), onClick = {
+                    onSaveCustom(theme.copy(name = customName.trim())); showSaveDialog = false
+                }) { Text("Save") }
+            },
+            dismissButton = { TextButton(onClick = { showSaveDialog = false }) { Text("Cancel") } }
+        )
     }
 }
 
@@ -353,6 +372,13 @@ private fun RomSection(onChangeRom: () -> Unit) {
     }
 }
 
+/** Opacity slider with a percentage readout (alpha stored as 0..255). */
+@Composable
+private fun OpacitySlider(label: String, alpha: Int, onChange: (Int) -> Unit) {
+    Text("$label: ${(alpha * 100f / 255f).roundToInt()}%", style = MaterialTheme.typography.titleMedium)
+    Slider(alpha.toFloat(), { onChange(it.roundToInt()) }, valueRange = 0f..255f)
+}
+
 @Composable
 private fun GlowToggle(checked: Boolean, onChange: (Boolean) -> Unit) = SwitchRow("Glow effect", checked, onChange)
 
@@ -366,22 +392,28 @@ private fun SwitchRow(label: String, checked: Boolean, onChange: (Boolean) -> Un
 
 @Composable
 private fun VsyncToggle(checked: Boolean, onChange: (Boolean) -> Unit) {
-    var showTip by remember { mutableStateOf(false) }
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("Vsync", style = MaterialTheme.typography.titleMedium)
-        Box(
-            modifier = Modifier.size(22.dp).clip(CircleShape)
-                .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape)
-                .clickable { showTip = !showTip },
-            contentAlignment = Alignment.Center
-        ) { Text("?", style = MaterialTheme.typography.labelMedium) }
+        ExperimentalBadge()
         Switch(checked = checked, onCheckedChange = onChange)
     }
-    if (showTip) {
-        Text(
-            "Enables Vsync, like the widget. This removes flicker, but loses the authentic " +
-                "screen-refresh behavior of the real device.",
-            style = MaterialTheme.typography.bodySmall
-        )
-    }
+    Text(
+        "Enables Vsync, like the widget. This removes flicker, but loses the authentic " +
+            "screen-refresh behavior of the real device.",
+        style = MaterialTheme.typography.bodySmall
+    )
+}
+
+/** Small pill marking a feature as still under test. */
+@Composable
+private fun ExperimentalBadge() {
+    Text(
+        "EXPERIMENTAL",
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onTertiaryContainer,
+        modifier = Modifier
+            .clip(RoundedCornerShape(4.dp))
+            .background(MaterialTheme.colorScheme.tertiaryContainer)
+            .padding(horizontal = 6.dp, vertical = 2.dp)
+    )
 }

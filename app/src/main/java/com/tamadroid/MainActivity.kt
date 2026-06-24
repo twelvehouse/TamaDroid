@@ -48,6 +48,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
@@ -65,9 +66,10 @@ import com.tamadroid.data.RomRepository
 import com.tamadroid.data.SaveStore
 import com.tamadroid.service.TamaRuntime
 import com.tamadroid.service.TamaService
+import com.tamadroid.ui.PlayArea
 import com.tamadroid.ui.PlayBgEditor
+import com.tamadroid.ui.PlayEdit
 import com.tamadroid.ui.SettingsScreen
-import com.tamadroid.ui.TamaScreen
 import com.tamadroid.ui.TamaTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -223,11 +225,6 @@ private fun EmulatorScreen(onOpenSettings: () -> Unit) {
     val bgRes = if (AppPrefs.hasPlayImage(ctx)) null
         else com.tamadroid.ui.backgroundDrawable(AppPrefs.background(ctx))
     val dark = isSystemInDarkTheme()
-    val effect = AppPrefs.effect(ctx)
-    val dotColor = AppPrefs.lcdDot(ctx)
-    val packed = AppPrefs.lcdPacked(ctx)
-    val playBg = AppPrefs.playBgColor(ctx, dark)
-    val buttonColor = AppPrefs.playButtonColor(ctx, dark)
     val playImage = AppPrefs.playImage(ctx)
     val playBmp = remember(playImage) {
         if (playImage != null)
@@ -236,36 +233,23 @@ private fun EmulatorScreen(onOpenSettings: () -> Unit) {
             )?.asImageBitmap()
         else null
     }
+    val positions = remember { AppPrefs.playButtonPositions(ctx).map { Offset(it.first, it.second) } }
 
-    Box(modifier = Modifier.fillMaxSize().background(Color(playBg))) {
-        if (playBmp != null && playImage != null) {
-            Image(
-                bitmap = playBmp,
-                contentDescription = null,
-                contentScale = ContentScale.Fit,
-                modifier = Modifier.fillMaxSize().graphicsLayer(
-                    translationX = playImage.offsetX, translationY = playImage.offsetY,
-                    scaleX = playImage.scale, scaleY = playImage.scale
-                )
-            )
-        }
-        Column(
-            modifier = Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(24.dp, Alignment.CenterVertically),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            if (frame != null) {
-                TamaScreen(frame.fb, frame.icons, bgRes, effect, dotColor, packed = packed, modifier = Modifier.fillMaxWidth())
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(24.dp, Alignment.CenterHorizontally)
-            ) {
-                TamaButton(TamaCore.BTN_LEFT, buttonColor)
-                TamaButton(TamaCore.BTN_MIDDLE, buttonColor)
-                TamaButton(TamaCore.BTN_RIGHT, buttonColor)
-            }
-        }
+    Box(modifier = Modifier.fillMaxSize()) {
+        PlayArea(
+            frame = frame,
+            bgRes = bgRes,
+            effect = AppPrefs.effect(ctx),
+            dotColor = AppPrefs.lcdDot(ctx),
+            packed = AppPrefs.lcdPacked(ctx),
+            bgColor = AppPrefs.playBgColor(ctx, dark),
+            playBmp = playBmp,
+            playImage = playImage,
+            buttonColor = AppPrefs.playButtonColor(ctx, dark),
+            buttonAlpha = AppPrefs.playButtonAlpha(ctx),
+            buttonPositions = positions,
+            mode = PlayEdit.NONE,
+        )
         FloatingActionButton(
             onClick = onOpenSettings,
             modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)
@@ -273,42 +257,4 @@ private fun EmulatorScreen(onOpenSettings: () -> Unit) {
             Icon(painterResource(R.drawable.ic_settings), contentDescription = "Settings")
         }
     }
-}
-
-/** Short haptic tick on button press (if enabled in settings). */
-private fun buttonTick(ctx: Context) {
-    if (!AppPrefs.vibrate(ctx)) return
-    val vib = if (Build.VERSION.SDK_INT >= 31) {
-        (ctx.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager).defaultVibrator
-    } else {
-        @Suppress("DEPRECATION")
-        (ctx.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator)
-    }
-    if (!vib.hasVibrator()) return
-    vib.vibrate(VibrationEffect.createOneShot(18, VibrationEffect.DEFAULT_AMPLITUDE))
-}
-
-@Composable
-private fun TamaButton(btn: Int, color: Int) {
-    val ctx = LocalContext.current
-    // Collect press/release EVENTS (a quick tap toggles the pressed *state* within one
-    // frame, so observing state misses it — but every PressInteraction is delivered).
-    // No labels: the real device buttons are unlabelled.
-    val interaction = remember { MutableInteractionSource() }
-    LaunchedEffect(interaction) {
-        interaction.interactions.collect { i ->
-            when (i) {
-                is PressInteraction.Press -> { buttonTick(ctx); TamaRuntime.press(btn, true) }
-                is PressInteraction.Release -> TamaRuntime.press(btn, false)
-                is PressInteraction.Cancel -> TamaRuntime.press(btn, false)
-            }
-        }
-    }
-    Button(
-        onClick = {},
-        interactionSource = interaction,
-        colors = ButtonDefaults.buttonColors(containerColor = Color(color)),
-        modifier = Modifier.size(56.dp),
-        contentPadding = PaddingValues(0.dp)
-    ) {}
 }

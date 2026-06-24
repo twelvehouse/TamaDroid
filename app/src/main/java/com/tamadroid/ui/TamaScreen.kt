@@ -98,13 +98,17 @@ fun TamaScreen(
             )
         }
 
-        // Alignment guide: outline at the device-frame edge (used by the bg-image editor).
+        // Alignment guide (bg-image editor): a SQUARE outline centered on the device, to
+        // approximate the real Tamagotchi's roughly-square body/screen proportions (the
+        // 144x168 canvas itself is taller than the original).
         if (guideColor != null) {
             val inset = 4f * s
+            val side = size.width - 2 * inset
+            val top = (size.height - side) / 2f
             drawRoundRect(
                 color = guideColor,
-                topLeft = Offset(inset, inset),
-                size = Size(size.width - 2 * inset, size.height - 2 * inset),
+                topLeft = Offset(inset, top),
+                size = Size(side, side),
                 cornerRadius = CornerRadius(16f * s, 16f * s),
                 style = Stroke(width = 3f * s)
             )

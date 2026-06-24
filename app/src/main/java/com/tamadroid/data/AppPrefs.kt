@@ -18,6 +18,8 @@ object AppPrefs {
     private const val K_LCD_CUSTOM = "lcd_custom"
     private const val K_PLAY_BG = "play_bg_color"
     private const val K_PLAY_BTN = "play_btn_color"
+    private const val K_PLAY_BTN_ALPHA = "play_btn_alpha"
+    private const val K_PLAY_BTN_POS = "play_btn_pos"  // "x,y;x,y;x,y" normalized centers
     private const val K_PLAY_IMG = "play_img"          // 1 if a bg image is set
     private const val K_PLAY_OFFX = "play_off_x"
     private const val K_PLAY_OFFY = "play_off_y"
@@ -38,6 +40,16 @@ object AppPrefs {
 
     /** Play-screen background image transform (px offset + scale), or null if no image. */
     data class PlayImage(val offsetX: Float, val offsetY: Float, val scale: Float)
+
+    const val DEFAULT_PLAY_BTN_ALPHA = 255
+
+    /** Normalized button centers (fraction of the play area) for L/M/R: a centered row,
+     *  low on screen, matching the classic layout. Customizable via the layout editor. */
+    val DEFAULT_BTN_POS: List<Pair<Float, Float>> = listOf(
+        0.27f to 0.80f,
+        0.50f to 0.80f,
+        0.73f to 0.80f,
+    )
 
     /** Device-frame background (Pebble frame). The frame is auto-hidden when a custom
      * play background image is set. BASALT/MONO share the 144x168 geometry. */
@@ -101,6 +113,24 @@ object AppPrefs {
     fun playButtonColor(ctx: Context, dark: Boolean): Int =
         p(ctx).let { if (it.contains(K_PLAY_BTN)) it.getInt(K_PLAY_BTN, 0) else defaultPlayButton(dark) }
     fun setPlayButtonColor(ctx: Context, c: Int) { p(ctx).edit().putInt(K_PLAY_BTN, c).apply() }
+
+    fun playButtonAlpha(ctx: Context): Int =
+        p(ctx).getInt(K_PLAY_BTN_ALPHA, DEFAULT_PLAY_BTN_ALPHA).coerceIn(0, 255)
+    fun setPlayButtonAlpha(ctx: Context, a: Int) { p(ctx).edit().putInt(K_PLAY_BTN_ALPHA, a.coerceIn(0, 255)).apply() }
+
+    /** Normalized button centers for L/M/R, or the defaults if never customized. */
+    fun playButtonPositions(ctx: Context): List<Pair<Float, Float>> {
+        val raw = p(ctx).getString(K_PLAY_BTN_POS, null) ?: return DEFAULT_BTN_POS
+        return runCatching {
+            raw.split(';').map { rec ->
+                val (x, y) = rec.split(',')
+                x.toFloat() to y.toFloat()
+            }.also { require(it.size == 3) }
+        }.getOrDefault(DEFAULT_BTN_POS)
+    }
+    fun setPlayButtonPositions(ctx: Context, list: List<Pair<Float, Float>>) {
+        p(ctx).edit().putString(K_PLAY_BTN_POS, list.joinToString(";") { "${it.first},${it.second}" }).apply()
+    }
 
     fun hasPlayImage(ctx: Context): Boolean =
         p(ctx).getBoolean(K_PLAY_IMG, false) && java.io.File(ctx.filesDir, PLAY_BG_IMAGE_FILE).exists()
