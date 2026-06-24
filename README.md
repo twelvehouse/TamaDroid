@@ -6,6 +6,8 @@
 
 An Android **Tamagotchi P1/P2 emulator** with a home-screen widget, powered by [TamaLib](https://github.com/jcrona/tamalib) via the NDK.
 
+## Demo  
+https://youtube.com/shorts/tBHBIujZzkU?si=LUq_GL_dYcSskZIC  
 [![TamaDroid demo](https://img.youtube.com/vi/tBHBIujZzkU/maxresdefault.jpg)](https://youtube.com/shorts/tBHBIujZzkU)
 
 ## Install
