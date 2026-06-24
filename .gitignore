@@ -13,6 +13,11 @@ captures/
 # --- Serena (local agent memories/cache; may contain local machine paths) ---
 .serena/
 
+# --- Signing keys (NEVER commit — stored in GitHub Secrets instead) ---
+*.jks
+*.keystore
+keystore.properties
+
 # --- Misc local junk ---
 *.stackdump
 
