@@ -54,4 +54,10 @@ object WidgetPrefs {
     fun removeCustomPreset(ctx: Context, name: String) {
         p(ctx).edit().putString(K_CUSTOM, ThemePresets.encode(customPresets(ctx).filter { it.name != name })).apply()
     }
+
+    /** Restores widget appearance (theme, effect, custom presets) to defaults. */
+    fun resetAll(ctx: Context) {
+        p(ctx).edit().clear().apply()
+        TamaWidgetProvider.refreshFromStore(ctx)
+    }
 }

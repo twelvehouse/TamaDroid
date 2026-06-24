@@ -9,6 +9,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -65,7 +66,7 @@ fun PlayBgEditor(onDone: () -> Unit, onCancel: () -> Unit) {
     val guide = lerp(Color(0xFF2196F3), Color(0xFFF44336), t)
 
     Box(
-        modifier = Modifier.fillMaxSize().background(Color(AppPrefs.playBgColor(ctx)))
+        modifier = Modifier.fillMaxSize().background(Color(AppPrefs.playBgColor(ctx, isSystemInDarkTheme())))
             .pointerInput(Unit) {
                 detectTransformGestures { _, pan, zoom, _ ->
                     offX += pan.x; offY += pan.y; scale = (scale * zoom).coerceIn(0.1f, 10f)

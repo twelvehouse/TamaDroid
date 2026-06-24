@@ -92,7 +92,7 @@ class TamaService : Service() {
 
     companion object {
         private const val ATTENTION_ICON = 7   // icon8 = attention/call (Pebble special-cases this)
-        private const val WIDGET_REFRESH_MS = 1000L   // fixed; Vsync keeps frames coherent
+        private const val WIDGET_REFRESH_MS = 500L   // fixed; Vsync keeps frames coherent
 
         fun start(ctx: Context) {
             val i = Intent(ctx, TamaService::class.java)

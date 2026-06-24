@@ -1,8 +1,12 @@
 package com.tamadroid
 
 import android.Manifest
+import android.content.Context
 import android.os.Build
 import android.os.Bundle
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -11,6 +15,7 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.layout.Arrangement
@@ -63,6 +68,7 @@ import com.tamadroid.service.TamaService
 import com.tamadroid.ui.PlayBgEditor
 import com.tamadroid.ui.SettingsScreen
 import com.tamadroid.ui.TamaScreen
+import com.tamadroid.ui.TamaTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -73,7 +79,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            MaterialTheme {
+            TamaTheme {
                 Surface(modifier = Modifier.fillMaxSize()) { App() }
             }
         }
@@ -216,10 +222,11 @@ private fun EmulatorScreen(onOpenSettings: () -> Unit) {
     // A custom play background image auto-hides the device frame.
     val bgRes = if (AppPrefs.hasPlayImage(ctx)) null
         else com.tamadroid.ui.backgroundDrawable(AppPrefs.background(ctx))
+    val dark = isSystemInDarkTheme()
     val effect = AppPrefs.effect(ctx)
     val dotColor = AppPrefs.lcdDot(ctx)
-    val playBg = AppPrefs.playBgColor(ctx)
-    val buttonColor = AppPrefs.playButtonColor(ctx)
+    val playBg = AppPrefs.playBgColor(ctx, dark)
+    val buttonColor = AppPrefs.playButtonColor(ctx, dark)
     val playImage = AppPrefs.playImage(ctx)
     val playBmp = remember(playImage) {
         if (playImage != null)
@@ -267,8 +274,22 @@ private fun EmulatorScreen(onOpenSettings: () -> Unit) {
     }
 }
 
+/** Short haptic tick on button press (if enabled in settings). */
+private fun buttonTick(ctx: Context) {
+    if (!AppPrefs.vibrate(ctx)) return
+    val vib = if (Build.VERSION.SDK_INT >= 31) {
+        (ctx.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager).defaultVibrator
+    } else {
+        @Suppress("DEPRECATION")
+        (ctx.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator)
+    }
+    if (!vib.hasVibrator()) return
+    vib.vibrate(VibrationEffect.createOneShot(18, VibrationEffect.DEFAULT_AMPLITUDE))
+}
+
 @Composable
 private fun TamaButton(btn: Int, color: Int) {
+    val ctx = LocalContext.current
     // Collect press/release EVENTS (a quick tap toggles the pressed *state* within one
     // frame, so observing state misses it — but every PressInteraction is delivered).
     // No labels: the real device buttons are unlabelled.
@@ -276,7 +297,7 @@ private fun TamaButton(btn: Int, color: Int) {
     LaunchedEffect(interaction) {
         interaction.interactions.collect { i ->
             when (i) {
-                is PressInteraction.Press -> TamaRuntime.press(btn, true)
+                is PressInteraction.Press -> { buttonTick(ctx); TamaRuntime.press(btn, true) }
                 is PressInteraction.Release -> TamaRuntime.press(btn, false)
                 is PressInteraction.Cancel -> TamaRuntime.press(btn, false)
             }

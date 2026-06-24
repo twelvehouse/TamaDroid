@@ -21,12 +21,19 @@ object AppPrefs {
     private const val K_PLAY_OFFX = "play_off_x"
     private const val K_PLAY_OFFY = "play_off_y"
     private const val K_PLAY_SCALE = "play_scale"
+    private const val K_VIBRATE = "vibrate"
 
     /** Default in-app LCD dot color (classic dark LCD). */
     const val DEFAULT_LCD_DOT = 0xFF1B2410.toInt()
-    const val DEFAULT_PLAY_BG = 0xFF101418.toInt()
-    const val DEFAULT_PLAY_BTN = 0xFF6750A4.toInt()
     const val PLAY_BG_IMAGE_FILE = "play_bg.png"
+
+    // Default play-screen colors track the system theme until the user picks their own.
+    const val DEFAULT_PLAY_BG_DARK = 0xFF101418.toInt()
+    const val DEFAULT_PLAY_BG_LIGHT = 0xFFF2F3F5.toInt()
+    const val DEFAULT_PLAY_BTN_DARK = 0xFFB69DF8.toInt()
+    const val DEFAULT_PLAY_BTN_LIGHT = 0xFF6750A4.toInt()
+    fun defaultPlayBg(dark: Boolean) = if (dark) DEFAULT_PLAY_BG_DARK else DEFAULT_PLAY_BG_LIGHT
+    fun defaultPlayButton(dark: Boolean) = if (dark) DEFAULT_PLAY_BTN_DARK else DEFAULT_PLAY_BTN_LIGHT
 
     /** Play-screen background image transform (px offset + scale), or null if no image. */
     data class PlayImage(val offsetX: Float, val offsetY: Float, val scale: Float)
@@ -76,11 +83,18 @@ object AppPrefs {
         p(ctx).edit().putString(K_LCD_CUSTOM, ThemePresets.encode(lcdCustomPresets(ctx).filter { it.name != name })).apply()
     }
 
+    // ---- Vibration (button haptic feedback) ----
+    fun vibrate(ctx: Context): Boolean = p(ctx).getBoolean(K_VIBRATE, true)
+    fun setVibrate(ctx: Context, on: Boolean) { p(ctx).edit().putBoolean(K_VIBRATE, on).apply() }
+
     // ---- Play screen ----
-    fun playBgColor(ctx: Context): Int = p(ctx).getInt(K_PLAY_BG, DEFAULT_PLAY_BG)
+    // Colors fall back to a theme-appropriate default until the user picks one explicitly.
+    fun playBgColor(ctx: Context, dark: Boolean): Int =
+        p(ctx).let { if (it.contains(K_PLAY_BG)) it.getInt(K_PLAY_BG, 0) else defaultPlayBg(dark) }
     fun setPlayBgColor(ctx: Context, c: Int) { p(ctx).edit().putInt(K_PLAY_BG, c).apply() }
 
-    fun playButtonColor(ctx: Context): Int = p(ctx).getInt(K_PLAY_BTN, DEFAULT_PLAY_BTN)
+    fun playButtonColor(ctx: Context, dark: Boolean): Int =
+        p(ctx).let { if (it.contains(K_PLAY_BTN)) it.getInt(K_PLAY_BTN, 0) else defaultPlayButton(dark) }
     fun setPlayButtonColor(ctx: Context, c: Int) { p(ctx).edit().putInt(K_PLAY_BTN, c).apply() }
 
     fun hasPlayImage(ctx: Context): Boolean =
@@ -103,6 +117,12 @@ object AppPrefs {
 
     fun clearPlayImage(ctx: Context) {
         p(ctx).edit().putBoolean(K_PLAY_IMG, false).apply()
+        java.io.File(ctx.filesDir, PLAY_BG_IMAGE_FILE).delete()
+    }
+
+    /** Restores ALL in-app settings to defaults. Does NOT touch the ROM or the pet save. */
+    fun resetSettings(ctx: Context) {
+        p(ctx).edit().clear().apply()
         java.io.File(ctx.filesDir, PLAY_BG_IMAGE_FILE).delete()
     }
 }

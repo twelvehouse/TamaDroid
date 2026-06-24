@@ -7,6 +7,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -88,6 +89,8 @@ fun SettingsScreen(onBack: () -> Unit, onChangeRom: () -> Unit, onEditImage: () 
                     GameSection()
                     HorizontalDivider()
                     RomSection(onChangeRom)
+                    HorizontalDivider()
+                    ResetSection(onResetComplete = onBack)
                 }
             }
         }
@@ -97,8 +100,9 @@ fun SettingsScreen(onBack: () -> Unit, onChangeRom: () -> Unit, onEditImage: () 
 @Composable
 private fun PlaySection(onEditImage: () -> Unit) {
     val ctx = LocalContext.current
-    var bgColor by remember { mutableStateOf(AppPrefs.playBgColor(ctx)) }
-    var btnColor by remember { mutableStateOf(AppPrefs.playButtonColor(ctx)) }
+    val dark = isSystemInDarkTheme()
+    var bgColor by remember { mutableStateOf(AppPrefs.playBgColor(ctx, dark)) }
+    var btnColor by remember { mutableStateOf(AppPrefs.playButtonColor(ctx, dark)) }
     var frameBg by remember { mutableStateOf(AppPrefs.background(ctx)) }
     var hasImage by remember { mutableStateOf(AppPrefs.hasPlayImage(ctx)) }
 
@@ -144,6 +148,7 @@ private fun PlaySection(onEditImage: () -> Unit) {
 private fun GameSection() {
     val ctx = LocalContext.current
     var speed by remember { mutableStateOf(AppPrefs.gameSpeed(ctx)) }
+    var vibrate by remember { mutableStateOf(AppPrefs.vibrate(ctx)) }
     Text("Game speed: ${speed}x", style = MaterialTheme.typography.titleMedium)
     Slider(
         value = speed.toFloat(),
@@ -153,6 +158,40 @@ private fun GameSection() {
         steps = (AppPrefs.MAX_SPEED - AppPrefs.MIN_SPEED - 1)
     )
     Text("1x = real time. Higher = the pet lives faster.", style = MaterialTheme.typography.bodySmall)
+
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("Vibration", style = MaterialTheme.typography.titleMedium)
+        Switch(checked = vibrate, onCheckedChange = { vibrate = it; AppPrefs.setVibrate(ctx, it) })
+    }
+    Text("Short haptic feedback when you press A/B/C.", style = MaterialTheme.typography.bodySmall)
+}
+
+@Composable
+private fun ResetSection(onResetComplete: () -> Unit) {
+    val ctx = LocalContext.current
+    var confirm by remember { mutableStateOf(false) }
+    Text("Reset", style = MaterialTheme.typography.titleMedium)
+    Text("Restores all settings to their defaults. Your pet and ROM are kept.")
+    OutlinedButton(onClick = { confirm = true }) { Text("Reset settings") }
+
+    if (confirm) {
+        AlertDialog(
+            onDismissRequest = { confirm = false },
+            title = { Text("Reset settings?") },
+            text = { Text("All settings go back to defaults. Your pet and ROM are NOT affected. Continue?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    AppPrefs.resetSettings(ctx)
+                    WidgetPrefs.resetAll(ctx)
+                    TamaRuntime.setSpeed(AppPrefs.gameSpeed(ctx))
+                    TamaRuntime.setVsync(AppPrefs.inAppVsync(ctx))
+                    confirm = false
+                    onResetComplete()
+                }) { Text("Reset") }
+            },
+            dismissButton = { TextButton(onClick = { confirm = false }) { Text("Cancel") } }
+        )
+    }
 }
 
 @Composable
