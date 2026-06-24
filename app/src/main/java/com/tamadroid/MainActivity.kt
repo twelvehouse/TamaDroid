@@ -241,6 +241,7 @@ private fun EmulatorScreen(onOpenSettings: () -> Unit) {
             bgRes = bgRes,
             effect = AppPrefs.effect(ctx),
             dotColor = AppPrefs.lcdDot(ctx),
+            iconColor = AppPrefs.effectiveIconColor(ctx),
             packed = AppPrefs.lcdPacked(ctx),
             bgColor = AppPrefs.playBgColor(ctx, dark),
             playBmp = playBmp,

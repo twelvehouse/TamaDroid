@@ -46,11 +46,12 @@ object TamaCore {
     /** Set a button state immediately (applied next step). Any thread. */
     external fun nativeSetButton(btn: Int, pressed: Boolean)
 
-    /** Copy the latest LIVE frame (in-app; may tear mid-redraw). */
+    /** Copy the latest LIVE frame (published ~30 fps) — in-app view (full animation). */
     external fun nativeGetFrame(fb: ByteArray, icons: ByteArray)
 
-    /** Copy the latest VSYNC frame (widget; only fully-settled coherent frames). */
-    external fun nativeGetVsyncFrame(fb: ByteArray, icons: ByteArray)
+    /** Copy the latest SETTLE frame (never torn; 30 Hz animations skipped) — widget
+     *  anti-tearing mode. */
+    external fun nativeGetSettleFrame(fb: ByteArray, icons: ByteArray)
 
     external fun nativeRelease()
 }

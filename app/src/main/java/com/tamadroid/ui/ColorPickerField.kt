@@ -62,6 +62,12 @@ fun ColorSwatchButton(label: String, color: Int, onPick: (Int) -> Unit) {
 private fun ColorPickerDialog(initial: Int, onDismiss: () -> Unit, onConfirm: (Int) -> Unit) {
     val controller = rememberColorPickerController()
     var current by remember { mutableStateOf(initial) }
+    // skydoves' HsvColorPicker `initialColor` only positions the wheel by hue/saturation and
+    // FORCES value=1f, so the BrightnessSlider never receives the initial brightness (a dark
+    // color initializes as its full-brightness hue). Once the canvas is laid out the first
+    // color event fires; at that point canvasSize is valid, so re-select the full color via
+    // selectByColor (sets wheel + alpha + brightness) exactly once to fix the initial state.
+    var brightnessApplied by remember { mutableStateOf(false) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Pick a color") },
@@ -73,7 +79,13 @@ private fun ColorPickerDialog(initial: Int, onDismiss: () -> Unit, onConfirm: (I
                     modifier = Modifier.fillMaxWidth().height(240.dp),
                     controller = controller,
                     initialColor = Color(initial),
-                    onColorChanged = { env -> if (env.color.toArgb() != 0) current = env.color.toArgb() }
+                    onColorChanged = { env ->
+                        if (env.color.toArgb() != 0) current = env.color.toArgb()
+                        if (!brightnessApplied) {
+                            brightnessApplied = true
+                            controller.selectByColor(Color(initial), false)
+                        }
+                    }
                 )
                 BrightnessSlider(
                     modifier = Modifier.fillMaxWidth().height(32.dp),

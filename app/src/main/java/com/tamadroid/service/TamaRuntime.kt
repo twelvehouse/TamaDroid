@@ -50,7 +50,6 @@ object TamaRuntime {
             elapsedSecondsClosed = 0,            // Option C: no catch-up
             initialSpeed = AppPrefs.gameSpeed(ctx),
         )
-        eng.setVsync(AppPrefs.inAppVsync(ctx))
         engine = eng
         sound = sp
         return true
@@ -59,8 +58,6 @@ object TamaRuntime {
     fun press(btn: Int, pressed: Boolean) { engine?.pressButton(btn, pressed) }
 
     fun setSpeed(mult: Int) { engine?.setSpeed(mult) }
-
-    fun setVsync(on: Boolean) { engine?.setVsync(on) }
 
     fun requestSave() { engine?.requestSave() }
 

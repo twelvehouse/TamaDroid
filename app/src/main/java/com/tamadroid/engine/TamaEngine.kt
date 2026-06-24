@@ -41,10 +41,6 @@ class TamaEngine(
     val frame: StateFlow<Frame> = _frame
 
     @Volatile private var running = false
-    @Volatile private var useVsync = false   // in-app: read coherent frames (no tearing)
-
-    /** When true the in-app frame poller reads the coherent (Vsync) frame instead of live. */
-    fun setVsync(on: Boolean) { useVsync = on }
 
     fun start(
         rom: IntArray,
@@ -80,7 +76,7 @@ class TamaEngine(
             val icons = ByteArray(TamaCore.ICON_NUM)
             var seq = 0L
             while (isActive) {
-                if (useVsync) TamaCore.nativeGetVsyncFrame(fb, icons) else TamaCore.nativeGetFrame(fb, icons)
+                TamaCore.nativeGetFrame(fb, icons)
                 _frame.value = Frame(fb.copyOf(), icons.copyOf(), ++seq)
                 delay(FRAME_MS)
             }

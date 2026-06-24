@@ -5,8 +5,8 @@ import com.tamadroid.ui.LcdEffect
 
 /**
  * Persists widget appearance (SharedPreferences). Custom presets are stored as
- * `name|bg|dot|alpha` records joined by ';'. Refresh is fixed (1 s) since Vsync keeps
- * frames coherent, so no refresh-rate setting is needed.
+ * `name|bg|dot|alpha` records joined by ';'. Refresh is a fixed interval (the run loop
+ * already publishes coherent frames), so no refresh-rate setting is needed.
  */
 object WidgetPrefs {
     private const val FILE = "widget_prefs"
@@ -16,6 +16,7 @@ object WidgetPrefs {
     private const val K_FX = "fx"
     private const val K_CUSTOM = "custom_presets"
     private const val K_PACKED = "packed"
+    private const val K_ANTITEAR = "anti_tear"
 
     private fun p(ctx: Context) = ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE)
 
@@ -25,6 +26,11 @@ object WidgetPrefs {
         p(ctx).edit().putBoolean(K_PACKED, on).apply()
         TamaWidgetProvider.refreshFromStore(ctx)
     }
+
+    /** Anti-tearing (experimental): the widget reads only fully-settled frames, so it never
+     *  shows a partial redraw — at the cost of skipping 30 Hz animations. Default ON. */
+    fun antiTear(ctx: Context): Boolean = p(ctx).getBoolean(K_ANTITEAR, true)
+    fun setAntiTear(ctx: Context, on: Boolean) { p(ctx).edit().putBoolean(K_ANTITEAR, on).apply() }
 
     fun effect(ctx: Context): LcdEffect =
         runCatching { LcdEffect.valueOf(p(ctx).getString(K_FX, LcdEffect.NONE.name)!!) }

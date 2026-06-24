@@ -89,8 +89,8 @@ object WidgetFrameStore {
 /**
  * Renders the 32x16 LCD matrix to a themed bitmap with rounded corners and an optional
  * effect. Vertical margin = corner radius so the rounding never clips the (full-width)
- * LCD area. The effect is applied to the cached coherent (Vsync) frame — no shader
- * baking into a separate pass needed.
+ * LCD area. The effect is applied to the coherent frame published by the run loop — no
+ * shader baking into a separate pass needed.
  */
 object WidgetRenderer {
     private const val SCALE = 16

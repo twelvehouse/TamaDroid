@@ -7,6 +7,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -21,8 +24,8 @@ import kotlin.math.roundToInt
 /*
  * In-app device screen: mimics the Pebble default-platform layout (144x168 canvas).
  * Background frame + 8 LCD icons via Compose; the LCD dot matrix via the shared
- * [LcdFx] (so glow/LCD/VHS look identical to the widget). In-app rendering is LIVE
- * (low latency, tearing acceptable) — Vsync is widget-only.
+ * [LcdFx] (so glow/LCD/VHS look identical to the widget). The in-app view and the widget
+ * both read the same coherent frame published once per frame by the native run loop.
  */
 private const val CANVAS_W = 144f
 private const val CANVAS_H = 168f
@@ -52,6 +55,7 @@ fun TamaScreen(
     bgRes: Int?,
     effect: LcdEffect,
     dotColor: Int = LCD_ON,
+    iconColor: Int? = null,   // null = follow the dot color (icons are tinted via their alpha mask)
     allIcons: Boolean = false,
     guideColor: androidx.compose.ui.graphics.Color? = null,
     packed: Boolean = true,
@@ -88,13 +92,18 @@ fun TamaScreen(
             LcdFx.draw(canvas.nativeCanvas, fb, LCD_X * s, LCD_Y * s, DOT_PITCH * s, dotColor or (0xFF shl 24), effect, LcdFx.gap(packed))
         }
 
+        // Icons are transparent-background black silhouettes; SrcIn tint replaces the opaque
+        // pixels' color while keeping their alpha, i.e. uses the PNG as a mask so the icon
+        // color matches the LCD dots (or a separately chosen color).
+        val iconTint = ColorFilter.tint(Color((iconColor ?: dotColor) or (0xFF shl 24)), BlendMode.SrcIn)
         for (i in 0 until TamaCore.ICON_NUM) {
             if (!allIcons && icons.getOrNull(i)?.toInt() == 0) continue
             drawImage(
                 image = iconBitmaps[i],
                 dstOffset = IntOffset((iconSlotX(i) * s).roundToInt(), (iconSlotY(i) * s).roundToInt()),
                 dstSize = IntSize((ICON_W * s).roundToInt(), (ICON_H * s).roundToInt()),
-                filterQuality = FilterQuality.None
+                filterQuality = FilterQuality.None,
+                colorFilter = iconTint
             )
         }
 

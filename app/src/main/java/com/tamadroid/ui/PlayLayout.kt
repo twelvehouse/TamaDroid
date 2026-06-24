@@ -76,6 +76,7 @@ fun PlayArea(
     bgRes: Int?,
     effect: LcdEffect,
     dotColor: Int,
+    iconColor: Int? = null,
     packed: Boolean,
     bgColor: Int,
     playBmp: ImageBitmap?,
@@ -131,6 +132,7 @@ fun PlayArea(
                     bgRes = bgRes,
                     effect = effect,
                     dotColor = dotColor,
+                    iconColor = iconColor,
                     allIcons = mode != PlayEdit.NONE,   // editor: show every icon for clarity
                     guideColor = guideColor,
                     packed = packed,

@@ -8,6 +8,7 @@ import android.os.IBinder
 import androidx.core.app.ServiceCompat
 import com.tamadroid.core.TamaCore
 import com.tamadroid.widget.TamaWidgetProvider
+import com.tamadroid.widget.WidgetPrefs
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -58,9 +59,10 @@ class TamaService : Service() {
             val icons = ByteArray(TamaCore.ICON_NUM)
             while (isActive) {
                 if (TamaRuntime.isRunning && TamaWidgetProvider.hasWidgets(this@TamaService)) {
-                    // Vsync frame = only fully-settled (coherent) frames, so even at a
-                    // slow 1 s cadence the widget never shows a half-drawn frame.
-                    TamaCore.nativeGetVsyncFrame(fb, icons)
+                    // Anti-tearing (default on): read the SETTLE frame — never partial, but
+                    // skips 30 Hz animations. Off: the live frame (animates, may briefly tear).
+                    if (WidgetPrefs.antiTear(this@TamaService)) TamaCore.nativeGetSettleFrame(fb, icons)
+                    else TamaCore.nativeGetFrame(fb, icons)
                     TamaWidgetProvider.pushFrame(this@TamaService, fb.copyOf())
                 }
                 delay(WIDGET_REFRESH_MS)
@@ -99,7 +101,10 @@ class TamaService : Service() {
     companion object {
         private const val ATTENTION_ICON = 7   // icon8 = attention/call (Pebble special-cases this)
         private const val NEW_CALL_GAP_MS = 5000L   // quiet gap before the call icon counts as a new call
-        private const val WIDGET_REFRESH_MS = 500L   // fixed; Vsync keeps frames coherent
+        // Home-screen widgets update via RemoteViews IPC to the launcher, so true 30 fps
+        // isn't feasible; 200 ms (~5 fps) is a practical ceiling. Frames are already
+        // coherent (run loop publishes whole frames), so faster never tears.
+        private const val WIDGET_REFRESH_MS = 200L
 
         fun start(ctx: Context) {
             val i = Intent(ctx, TamaService::class.java)

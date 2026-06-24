@@ -12,10 +12,11 @@ object AppPrefs {
     private const val K_SPEED = "game_speed"
     private const val K_BG = "inapp_bg"
     private const val K_FX = "inapp_fx"
-    private const val K_VSYNC = "inapp_vsync"
     private const val K_LCD_PACKED = "lcd_packed"
     private const val K_LCD_DOT = "lcd_dot"
     private const val K_LCD_CUSTOM = "lcd_custom"
+    private const val K_ICON_SYNC = "icon_color_sync"   // icons follow the dot color
+    private const val K_ICON_COLOR = "icon_color"         // custom icon color (when not synced)
     private const val K_PLAY_BG = "play_bg_color"
     private const val K_PLAY_BTN = "play_btn_color"
     private const val K_PLAY_BTN_ALPHA = "play_btn_alpha"
@@ -73,9 +74,6 @@ object AppPrefs {
             .getOrDefault(LcdEffect.NONE)
     fun setEffect(ctx: Context, fx: LcdEffect) { p(ctx).edit().putString(K_FX, fx.name).apply() }
 
-    fun inAppVsync(ctx: Context): Boolean = p(ctx).getBoolean(K_VSYNC, false)
-    fun setInAppVsync(ctx: Context, on: Boolean) { p(ctx).edit().putBoolean(K_VSYNC, on).apply() }
-
     /** Packed dots (no gap, close like the real LCD) vs spaced dots. Default packed. */
     fun lcdPacked(ctx: Context): Boolean = p(ctx).getBoolean(K_LCD_PACKED, true)
     fun setLcdPacked(ctx: Context, on: Boolean) { p(ctx).edit().putBoolean(K_LCD_PACKED, on).apply() }
@@ -83,6 +81,19 @@ object AppPrefs {
     // ---- In-app LCD theme: only the dot color is used (the frame is the bg image). ----
     fun lcdDot(ctx: Context): Int = p(ctx).getInt(K_LCD_DOT, DEFAULT_LCD_DOT)
     fun setLcdDot(ctx: Context, dot: Int) { p(ctx).edit().putInt(K_LCD_DOT, dot).apply() }
+
+    // ---- Icon color: by default the LCD icons follow the dot color (tinted via their alpha
+    // mask). Turning sync off reveals a dedicated icon color. ----
+    fun iconColorSync(ctx: Context): Boolean = p(ctx).getBoolean(K_ICON_SYNC, true)
+    fun setIconColorSync(ctx: Context, on: Boolean) { p(ctx).edit().putBoolean(K_ICON_SYNC, on).apply() }
+
+    /** The user's custom icon color (used when sync is off); defaults to the current dot color. */
+    fun iconColorCustom(ctx: Context): Int = p(ctx).getInt(K_ICON_COLOR, lcdDot(ctx))
+    fun setIconColorCustom(ctx: Context, c: Int) { p(ctx).edit().putInt(K_ICON_COLOR, c).apply() }
+
+    /** Effective icon color to render with: the dot color when synced, else the custom color. */
+    fun effectiveIconColor(ctx: Context): Int =
+        if (iconColorSync(ctx)) lcdDot(ctx) else iconColorCustom(ctx)
 
     /** Active LCD theme wrapped as a [WidgetTheme] for the shared theme editor (bg/alpha unused). */
     fun lcdTheme(ctx: Context): WidgetTheme =

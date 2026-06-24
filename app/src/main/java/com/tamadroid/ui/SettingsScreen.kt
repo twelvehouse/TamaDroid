@@ -192,7 +192,6 @@ private fun ResetSection(onResetComplete: () -> Unit) {
                     AppPrefs.resetSettings(ctx)
                     WidgetPrefs.resetAll(ctx)
                     TamaRuntime.setSpeed(AppPrefs.gameSpeed(ctx))
-                    TamaRuntime.setVsync(AppPrefs.inAppVsync(ctx))
                     confirm = false
                     onResetComplete()
                 }) { Text("Reset") }
@@ -206,10 +205,11 @@ private fun ResetSection(onResetComplete: () -> Unit) {
 private fun LcdSection() {
     val ctx = LocalContext.current
     var glow by remember { mutableStateOf(AppPrefs.effect(ctx) == LcdEffect.GLOW) }
-    var vsync by remember { mutableStateOf(AppPrefs.inAppVsync(ctx)) }
     var packed by remember { mutableStateOf(AppPrefs.lcdPacked(ctx)) }
     var theme by remember { mutableStateOf(AppPrefs.lcdTheme(ctx)) }
     var custom by remember { mutableStateOf(AppPrefs.lcdCustomPresets(ctx)) }
+    var iconSync by remember { mutableStateOf(AppPrefs.iconColorSync(ctx)) }
+    var iconColor by remember { mutableStateOf(AppPrefs.iconColorCustom(ctx)) }
 
     val flow = TamaRuntime.frame
     val frame = if (flow != null) flow.collectAsStateWithLifecycle().value else null
@@ -220,6 +220,7 @@ private fun LcdSection() {
                 frame.fb, frame.icons, bgRes,
                 if (glow) LcdEffect.GLOW else LcdEffect.NONE,
                 dotColor = theme.dot,
+                iconColor = if (iconSync) theme.dot else iconColor,
                 packed = packed,
                 modifier = Modifier.fillMaxHeight()
             )
@@ -228,7 +229,6 @@ private fun LcdSection() {
 
     GlowToggle(glow) { glow = it; AppPrefs.setEffect(ctx, if (it) LcdEffect.GLOW else LcdEffect.NONE) }
     SwitchRow("Packed dots", packed) { packed = it; AppPrefs.setLcdPacked(ctx, it) }
-    VsyncToggle(vsync) { vsync = it; AppPrefs.setInAppVsync(ctx, it); TamaRuntime.setVsync(it) }
 
     ThemeControls(
         theme = theme,
@@ -238,6 +238,12 @@ private fun LcdSection() {
         onSaveCustom = { AppPrefs.addLcdCustomPreset(ctx, it); custom = AppPrefs.lcdCustomPresets(ctx) },
         onRemoveCustom = { AppPrefs.removeLcdCustomPreset(ctx, it); custom = AppPrefs.lcdCustomPresets(ctx) },
     )
+
+    // Icons follow the dot color by default; turning sync off reveals a dedicated picker.
+    SwitchRow("Sync icon color with dots", iconSync) { iconSync = it; AppPrefs.setIconColorSync(ctx, it) }
+    if (!iconSync) {
+        ColorSwatchButton("Icon color", iconColor) { iconColor = it; AppPrefs.setIconColorCustom(ctx, it) }
+    }
 }
 
 @Composable
@@ -246,6 +252,7 @@ private fun WidgetSection() {
     var theme by remember { mutableStateOf(WidgetPrefs.theme(ctx)) }
     var glow by remember { mutableStateOf(WidgetPrefs.effect(ctx) == LcdEffect.GLOW) }
     var packed by remember { mutableStateOf(WidgetPrefs.packed(ctx)) }
+    var antiTear by remember { mutableStateOf(WidgetPrefs.antiTear(ctx)) }
     var customName by remember { mutableStateOf("") }
     var custom by remember { mutableStateOf(WidgetPrefs.customPresets(ctx)) }
 
@@ -262,6 +269,7 @@ private fun WidgetSection() {
 
     GlowToggle(glow) { glow = it; WidgetPrefs.setEffect(ctx, if (it) LcdEffect.GLOW else LcdEffect.NONE) }
     SwitchRow("Packed dots", packed) { packed = it; WidgetPrefs.setPacked(ctx, it) }
+    AntiTearToggle(antiTear) { antiTear = it; WidgetPrefs.setAntiTear(ctx, it) }
 
     ThemeControls(
         theme = theme,
@@ -391,15 +399,14 @@ private fun SwitchRow(label: String, checked: Boolean, onChange: (Boolean) -> Un
 }
 
 @Composable
-private fun VsyncToggle(checked: Boolean, onChange: (Boolean) -> Unit) {
+private fun AntiTearToggle(checked: Boolean, onChange: (Boolean) -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Vsync", style = MaterialTheme.typography.titleMedium)
+        Text("Anti-tearing", style = MaterialTheme.typography.titleMedium)
         ExperimentalBadge()
         Switch(checked = checked, onCheckedChange = onChange)
     }
     Text(
-        "Enables Vsync, like the widget. This removes flicker, but loses the authentic " +
-            "screen-refresh behavior of the real device.",
+        "Removes tearing, but 30 fps animations won't be drawn.",
         style = MaterialTheme.typography.bodySmall
     )
 }
@@ -417,3 +424,5 @@ private fun ExperimentalBadge() {
             .padding(horizontal = 6.dp, vertical = 2.dp)
     )
 }
+
+

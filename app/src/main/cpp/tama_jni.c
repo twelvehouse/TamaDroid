@@ -50,20 +50,36 @@ static uint8_t g_fb[LCD_HEIGHT][LCD_WIDTH];   /* live framebuffer (loop thread) 
 static uint8_t g_icons[ICON_NUM];
 static int     g_initialized = 0;
 
-/* Live snapshot read by the in-app UI thread (nativeGetFrame) — may catch a frame
- * mid-redraw (tearing is fine in-app: low latency, realistic). */
+/* Live snapshot, published at ~FRAME_FPS — read by the in-app UI (full animation; a
+ * brief mid-redraw tear self-corrects within one frame, which is fine in-app). */
 static uint8_t        g_snap_fb[LCD_HEIGHT][LCD_WIDTH];
 static uint8_t        g_snap_icons[ICON_NUM];
 static pthread_mutex_t g_snap_lock = PTHREAD_MUTEX_INITIALIZER;
 
-/* Vsync snapshot for the WIDGET: only updated once a redraw burst has settled (no
- * pixel change for SETTLE), so the widget never shows a half-drawn frame. */
-static uint8_t        g_vsync_fb[LCD_HEIGHT][LCD_WIDTH];
-static uint8_t        g_vsync_icons[ICON_NUM];
-static pthread_mutex_t g_vsync_lock = PTHREAD_MUTEX_INITIALIZER;
-static int            g_frame_dirty = 0;   /* pixels changed since last settle */
-static int            g_px_changed  = 0;   /* set by HAL on a real pixel/icon change */
-#define SETTLE_TICKS  ((timestamp_t)(TS_FREQ * 16 / 1000))   /* ~16 ms quiescent = frame complete */
+/* Settle snapshot, published only once the display has been quiet for SETTLE — read by
+ * the WIDGET when anti-tearing is on. Never tears, but a 30 Hz animation (which never
+ * settles) is skipped; acceptable for the non-interactive widget. */
+static uint8_t        g_settle_fb[LCD_HEIGHT][LCD_WIDTH];
+static uint8_t        g_settle_icons[ICON_NUM];
+static pthread_mutex_t g_settle_lock = PTHREAD_MUTEX_INITIALIZER;
+
+/* Frame-settle publish. Measured: the firmware redraws the LCD in ~2 ms bursts ~32x/s,
+ * with ~28 ms of quiet between bursts, and NO consistent frame-end pixel. Sampling
+ * mid-burst tears. So publish the snapshot only once display writes have been quiet for
+ * SETTLE (long enough to bridge a multi-refresh pose update): the published frame is then
+ * always a complete pose, never partial. Used for the widget's anti-tearing mode. */
+static volatile int         g_fb_dirty      = 0;
+static volatile timestamp_t g_last_write_ts = 0;
+/* A single firmware pose update is written across SEVERAL 32 Hz refreshes (~31 ms apart),
+ * so the settle window must bridge those sub-updates (> the ~29 ms inter-refresh quiet) and
+ * only publish once the whole new pose is drawn and stable. Too small -> partial frames
+ * (top-left new, rest old); too large -> visible lag / could starve fast animation. */
+#define SETTLE_MS     64
+#define SETTLE_TICKS  ((timestamp_t)(TS_FREQ * SETTLE_MS / 1000))
+static timestamp_t now_ts(void);   /* forward decl (defined below) */
+static void mark_write(void) { g_last_write_ts = now_ts(); g_fb_dirty = 1; }
+
+
 
 /* Control flags (written from UI thread, read by the loop). */
 static volatile int g_running      = 0;
@@ -160,14 +176,14 @@ static void h_set_matrix(u8_t x, u8_t y, bool_t v)
 {
     if (x < LCD_WIDTH && y < LCD_HEIGHT && g_fb[y][x] != (uint8_t)v) {
         g_fb[y][x] = (uint8_t)v;
-        g_px_changed = 1;                 /* drives Vsync settle detection */
+        mark_write();
     }
 }
 static void h_set_icon(u8_t i, bool_t v)
 {
     if (i < ICON_NUM && g_icons[i] != (uint8_t)v) {
         g_icons[i] = (uint8_t)v;
-        g_px_changed = 1;
+        mark_write();
     }
 }
 static void h_update_screen(void)                  { }
@@ -300,13 +316,16 @@ JNI(void, nativeRun)(JNIEnv *env, jclass clazz)
     reset_clock();
     timestamp_t next_frame = 0;
     timestamp_t next_save  = (timestamp_t)AUTOSAVE_SEC * TS_FREQ;
-    timestamp_t last_change = 0;
 
-    /* Seed the Vsync frame with the current (coherent) display. */
-    pthread_mutex_lock(&g_vsync_lock);
-    memcpy(g_vsync_fb, g_fb, sizeof(g_fb));
-    memcpy(g_vsync_icons, g_icons, sizeof(g_icons));
-    pthread_mutex_unlock(&g_vsync_lock);
+    /* Seed both snapshots with the current (coherent) frame. */
+    pthread_mutex_lock(&g_snap_lock);
+    memcpy(g_snap_fb, g_fb, sizeof(g_fb));
+    memcpy(g_snap_icons, g_icons, sizeof(g_icons));
+    pthread_mutex_unlock(&g_snap_lock);
+    pthread_mutex_lock(&g_settle_lock);
+    memcpy(g_settle_fb, g_fb, sizeof(g_fb));
+    memcpy(g_settle_icons, g_icons, sizeof(g_icons));
+    pthread_mutex_unlock(&g_settle_lock);
 
     g_running = 1;
     while (g_running) {
@@ -330,11 +349,12 @@ JNI(void, nativeRun)(JNIEnv *env, jclass clazz)
             }
         }
 
-        tamalib_step();                 /* HAL paces to real time */
+        tamalib_step();                 /* HAL paces to real time (per-instruction sleep) */
 
         now = now_ts();
 
-        /* Live snapshot (in-app): coherent-enough, may tear during a redraw burst. */
+        /* Live snapshot @ ~FRAME_FPS for the in-app view (full animation; brief tears
+         * self-correct next frame). */
         if ((int32_t)(now - next_frame) >= 0) {
             next_frame = now + TS_FREQ / FRAME_FPS;
             pthread_mutex_lock(&g_snap_lock);
@@ -343,19 +363,17 @@ JNI(void, nativeRun)(JNIEnv *env, jclass clazz)
             pthread_mutex_unlock(&g_snap_lock);
         }
 
-        /* Vsync (widget): publish only once a redraw burst has settled. */
-        if (g_px_changed) {
-            g_px_changed = 0;
-            g_frame_dirty = 1;
-            last_change = now;
+        /* Settle snapshot for the widget's anti-tearing mode: publish only once writes
+         * have been quiet for SETTLE_TICKS, so a multi-refresh pose update is committed
+         * whole (never partial). A 30 Hz animation never settles, so it's skipped. */
+        if (g_fb_dirty && (int32_t)(now - g_last_write_ts) >= (int32_t)SETTLE_TICKS) {
+            g_fb_dirty = 0;
+            pthread_mutex_lock(&g_settle_lock);
+            memcpy(g_settle_fb, g_fb, sizeof(g_fb));
+            memcpy(g_settle_icons, g_icons, sizeof(g_icons));
+            pthread_mutex_unlock(&g_settle_lock);
         }
-        if (g_frame_dirty && (int32_t)(now - last_change) >= (int32_t)SETTLE_TICKS) {
-            g_frame_dirty = 0;
-            pthread_mutex_lock(&g_vsync_lock);
-            memcpy(g_vsync_fb, g_fb, sizeof(g_fb));
-            memcpy(g_vsync_icons, g_icons, sizeof(g_icons));
-            pthread_mutex_unlock(&g_vsync_lock);
-        }
+
         if (g_save_request || (int32_t)(now - next_save) >= 0) {
             g_save_request = 0;
             next_save = now + (timestamp_t)AUTOSAVE_SEC * TS_FREQ;
@@ -400,16 +418,17 @@ JNI(void, nativeGetFrame)(JNIEnv *env, jclass clazz, jbyteArray fbOut, jbyteArra
         (*env)->SetByteArrayRegion(env, iconsOut, 0, ICON_NUM, (const jbyte *)icons);
 }
 
-/* Vsync frame for the widget: last fully-settled (coherent) frame. */
-JNI(void, nativeGetVsyncFrame)(JNIEnv *env, jclass clazz, jbyteArray fbOut, jbyteArray iconsOut)
+/* Settle frame for the widget's anti-tearing mode: the last fully-settled (never-torn)
+ * frame. Skips 30 Hz animations (they never settle). */
+JNI(void, nativeGetSettleFrame)(JNIEnv *env, jclass clazz, jbyteArray fbOut, jbyteArray iconsOut)
 {
     (void)clazz;
     uint8_t fb[LCD_HEIGHT][LCD_WIDTH];
     uint8_t icons[ICON_NUM];
-    pthread_mutex_lock(&g_vsync_lock);
-    memcpy(fb, g_vsync_fb, sizeof(fb));
-    memcpy(icons, g_vsync_icons, sizeof(icons));
-    pthread_mutex_unlock(&g_vsync_lock);
+    pthread_mutex_lock(&g_settle_lock);
+    memcpy(fb, g_settle_fb, sizeof(fb));
+    memcpy(icons, g_settle_icons, sizeof(icons));
+    pthread_mutex_unlock(&g_settle_lock);
 
     if (fbOut && (*env)->GetArrayLength(env, fbOut) >= (jsize)(LCD_WIDTH * LCD_HEIGHT))
         (*env)->SetByteArrayRegion(env, fbOut, 0, LCD_WIDTH * LCD_HEIGHT, (const jbyte *)fb);
