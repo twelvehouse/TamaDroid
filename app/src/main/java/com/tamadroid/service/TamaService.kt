@@ -76,17 +76,16 @@ class TamaService : Service() {
         observing = true
         val flow = TamaRuntime.frame ?: return
         scope.launch {
-            // The attention icon BLINKS while the pet is calling, so a naive rising-edge
-            // check fires postCall (and replays the alert sound) on every blink. Debounce:
-            // treat continuous blinking as one call and notify once. A genuinely new call
-            // (icon quiet for longer than NEW_CALL_GAP_MS) alerts again.
-            var lastOn = 0L
+            // Fire on the rising edge of the attention icon (off -> on). During a single call the
+            // firmware animates this icon on/off every few seconds, producing many rising edges —
+            // but [TamaNotifications.postCall] rate-limits the alert, so one call yields one sound.
+            // (See postCall: the alert channel is IMPORTANCE_HIGH with a custom sound, so every
+            // notify() would otherwise replay it even though they collapse into one notification.)
+            var prev = false
             flow.collect { f ->
-                if (f.icons.getOrNull(ATTENTION_ICON)?.toInt() != 0) {
-                    val now = System.currentTimeMillis()
-                    if (now - lastOn > NEW_CALL_GAP_MS) TamaNotifications.postCall(this@TamaService)
-                    lastOn = now
-                }
+                val calling = f.icons.getOrNull(ATTENTION_ICON)?.toInt() != 0
+                if (calling && !prev) TamaNotifications.postCall(this@TamaService)
+                prev = calling
             }
         }
     }
@@ -100,7 +99,6 @@ class TamaService : Service() {
 
     companion object {
         private const val ATTENTION_ICON = 7   // icon8 = attention/call (Pebble special-cases this)
-        private const val NEW_CALL_GAP_MS = 5000L   // quiet gap before the call icon counts as a new call
         // Home-screen widgets update via RemoteViews IPC to the launcher, so true 30 fps
         // isn't feasible; 200 ms (~5 fps) is a practical ceiling. Frames are already
         // coherent (run loop publishes whole frames), so faster never tears.

@@ -19,6 +19,10 @@ object TamaNotifications {
     const val NOTIF_ALIVE = 1
     const val NOTIF_CALL = 2
 
+    /** Minimum spacing between call alerts. One call animates the attention icon for a while, so
+     *  this both de-dupes the burst into a single sound and serves as a reminder interval. */
+    private const val MIN_CALL_INTERVAL_MS = 60_000L   // 1 minute
+
     fun ensureChannels(ctx: Context) {
         val nm = ctx.getSystemService(NotificationManager::class.java)
 
@@ -72,7 +76,19 @@ object TamaNotifications {
             .build()
     }
 
+    /** When the last call alert was actually posted (process-global rate-limit anchor). */
+    @Volatile private var lastCallMs = 0L
+
     fun postCall(ctx: Context) {
+        // The point of this alert is to notice — while the app is closed — that the pet needs
+        // attention. A single call makes the attention icon animate on/off for many seconds, which
+        // produces a burst of rising edges; without this guard each one replays the HIGH-importance
+        // sound (one notification, sound N times). Rate-limit so a call alerts at most once per
+        // window, which also doubles as a gentle "still calling" reminder if the pet is ignored.
+        val now = System.currentTimeMillis()
+        if (now - lastCallMs < MIN_CALL_INTERVAL_MS) return
+        lastCallMs = now
+
         val n = NotificationCompat.Builder(ctx, CHANNEL_CALL)
             .setSmallIcon(R.drawable.ic_stat_tama)
             .setContentTitle("Your Tamagotchi is calling!")
