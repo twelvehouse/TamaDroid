@@ -26,6 +26,7 @@ object AppPrefs {
     private const val K_PLAY_OFFY = "play_off_y"
     private const val K_PLAY_SCALE = "play_scale"
     private const val K_VIBRATE = "vibrate"
+    private const val K_CLOCK_OVERWRITE = "clock_overwrite"  // stamp in-game clock with phone time
 
     /** Default in-app LCD dot color (classic dark LCD). */
     const val DEFAULT_LCD_DOT = 0xFF1B2410.toInt()
@@ -114,6 +115,11 @@ object AppPrefs {
     // ---- Vibration (button haptic feedback) ----
     fun vibrate(ctx: Context): Boolean = p(ctx).getBoolean(K_VIBRATE, true)
     fun setVibrate(ctx: Context, on: Boolean) { p(ctx).edit().putBoolean(K_VIBRATE, on).apply() }
+
+    // ---- Clock overwrite: forcibly stamp the in-game clock with the phone's time (on launch and
+    // periodically). Just writes the clock RAM — it does not advance the simulation. Default OFF. ----
+    fun clockOverwrite(ctx: Context): Boolean = p(ctx).getBoolean(K_CLOCK_OVERWRITE, false)
+    fun setClockOverwrite(ctx: Context, on: Boolean) { p(ctx).edit().putBoolean(K_CLOCK_OVERWRITE, on).apply() }
 
     // ---- Play screen ----
     // Colors fall back to a theme-appropriate default until the user picks one explicitly.

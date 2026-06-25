@@ -44,15 +44,35 @@ object TamaRuntime {
             onSound = { hz, on -> sp.onBuzzer(hz, on) },
         ).also { ref = it }
 
+        val clockOverwrite = AppPrefs.clockOverwrite(ctx)
         eng.start(
             rom = rom,
             restore = saveStore.load()?.state,
-            elapsedSecondsClosed = 0,            // Option C: no catch-up
             initialSpeed = AppPrefs.gameSpeed(ctx),
+            syncClockTo = if (clockOverwrite) phoneClock() else null,   // stamp the clock at launch
+            // Periodically re-stamp the clock with phone time while the toggle is on.
+            resyncProvider = { if (AppPrefs.clockOverwrite(ctx)) phoneClock() else null },
         )
         engine = eng
         sound = sp
         return true
+    }
+
+    /** Overwrite the in-game clock with phone time right now (e.g. the toggle was just turned on),
+     *  so it takes effect without an app restart. No-op unless the engine is running. */
+    fun requestClockSyncNow() {
+        val (h, m, s) = phoneClock()
+        engine?.syncClockNow(h, m, s)
+    }
+
+    /** Current phone wall-clock time-of-day as [hour, minute, second]. */
+    private fun phoneClock(): IntArray {
+        val c = java.util.Calendar.getInstance()
+        return intArrayOf(
+            c.get(java.util.Calendar.HOUR_OF_DAY),
+            c.get(java.util.Calendar.MINUTE),
+            c.get(java.util.Calendar.SECOND),
+        )
     }
 
     fun press(btn: Int, pressed: Boolean) { engine?.pressButton(btn, pressed) }

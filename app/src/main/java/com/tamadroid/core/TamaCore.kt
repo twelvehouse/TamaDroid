@@ -28,8 +28,13 @@ object TamaCore {
     /** Restore a snapshot (must be called after nativeInit, before nativeRun). */
     external fun nativeRestore(data: ByteArray): Boolean
 
-    /** Fast-forward ~tamaSeconds of emulated time (call before nativeRun). */
-    external fun nativeCatchUp(tamaSeconds: Int)
+    /** Clock-overwrite: set the in-game clock to the given phone time (instant write). Call
+     *  before nativeRun. */
+    external fun nativeSyncClock(hour: Int, minute: Int, second: Int)
+
+    /** Request the running loop to set the in-game clock to the given phone time (toggle /
+     *  periodic re-stamp). Applied next step. Safe from any thread. */
+    external fun nativeRequestClockSync(hour: Int, minute: Int, second: Int)
 
     /** Blocking real-time step loop; returns when [nativeStop] is called. */
     external fun nativeRun()

@@ -160,6 +160,7 @@ private fun GameSection() {
     val ctx = LocalContext.current
     var speed by remember { mutableStateOf(AppPrefs.gameSpeed(ctx)) }
     var vibrate by remember { mutableStateOf(AppPrefs.vibrate(ctx)) }
+    var clockOverwrite by remember { mutableStateOf(AppPrefs.clockOverwrite(ctx)) }
     Text("Game speed: ${speed}x", style = MaterialTheme.typography.titleMedium)
     Slider(
         value = speed.toFloat(),
@@ -168,6 +169,16 @@ private fun GameSection() {
         valueRange = AppPrefs.MIN_SPEED.toFloat()..AppPrefs.MAX_SPEED.toFloat(),
         steps = (AppPrefs.MAX_SPEED - AppPrefs.MIN_SPEED - 1)
     )
+
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Force local time", style = MaterialTheme.typography.titleMedium)
+        ExperimentalBadge()
+        Switch(checked = clockOverwrite, onCheckedChange = {
+            clockOverwrite = it; AppPrefs.setClockOverwrite(ctx, it)
+            if (it) TamaRuntime.requestClockSyncNow()
+        })
+    }
+    Text("Forcibly overwrites the in-game clock with your phone's time.", style = MaterialTheme.typography.bodySmall)
 
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Haptic feedback", style = MaterialTheme.typography.titleMedium)

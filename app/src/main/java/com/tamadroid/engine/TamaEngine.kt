@@ -45,22 +45,23 @@ class TamaEngine(
     fun start(
         rom: IntArray,
         restore: ByteArray? = null,
-        elapsedSecondsClosed: Long = 0,
         initialSpeed: Int = 1,
+        syncClockTo: IntArray? = null,   // phone [hour, minute, second] to stamp at launch, or null
+        resyncProvider: (() -> IntArray?)? = null,  // periodic re-stamp: phone [h,m,s], or null to skip
     ) {
         if (running) return
         running = true
         NativeBridge.sound = onSound
         NativeBridge.saver = onSave
         startFramePoller()
+        if (resyncProvider != null) startClockResync(resyncProvider)
         exec.execute {
             if (!TamaCore.nativeInit(rom)) {
                 running = false
                 return@execute
             }
             if (restore != null && TamaCore.nativeRestore(restore)) {
-                val catchUp = elapsedSecondsClosed.coerceIn(0, CATCHUP_CAP_SECONDS)
-                if (catchUp > 0) TamaCore.nativeCatchUp(catchUp.toInt())
+                syncClockTo?.let { TamaCore.nativeSyncClock(it[0], it[1], it[2]) }
             }
             TamaCore.nativeSetSpeed(initialSpeed)
             TamaCore.nativeRun()    // blocks until stop()
@@ -83,6 +84,22 @@ class TamaEngine(
         }
     }
 
+    /** Periodically re-stamp the in-game clock with phone time (clock-overwrite on). The provider
+     *  returns the phone [h,m,s] when it should run, else null. The write is instant, so cheap. */
+    private fun startClockResync(provider: () -> IntArray?) {
+        scope.launch {
+            while (isActive) {
+                delay(RESYNC_INTERVAL_MS)
+                provider()?.let { TamaCore.nativeRequestClockSync(it[0], it[1], it[2]) }
+            }
+        }
+    }
+
+    /** Set the in-game clock to phone time immediately (e.g. the user just turned the toggle on). */
+    fun syncClockNow(hour: Int, minute: Int, second: Int) {
+        if (running) TamaCore.nativeRequestClockSync(hour, minute, second)
+    }
+
     /** Set a button immediately (any thread). */
     fun pressButton(btn: Int, pressed: Boolean) = TamaCore.nativeSetButton(btn, pressed)
 
@@ -103,6 +120,6 @@ class TamaEngine(
 
     companion object {
         private const val FRAME_MS = 33L                    // ~30 fps UI poll
-        private const val CATCHUP_CAP_SECONDS = 6L * 3600   // cap resume fast-forward
+        private const val RESYNC_INTERVAL_MS = 5_000L       // how often clock-overwrite re-stamps
     }
 }

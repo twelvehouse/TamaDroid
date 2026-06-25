@@ -87,6 +87,11 @@ static volatile int g_btn_want[3]  = { 0, 0, 0 };   /* desired level   */
 static volatile int g_btn_edge[3]  = { 0, 0, 0 };   /* press latch     */
 static volatile int g_save_request = 0;
 
+/* In-game clock overwrite request: the UI/ticker fills the phone time and raises the flag; the
+ * loop writes it to the clock RAM on its own thread next step (instant). */
+static volatile int g_clock_request = 0;
+static volatile int g_clock_h = 0, g_clock_m = 0, g_clock_s = 0;
+
 /* Minimum time a button stays pressed once tapped, so the firmware's periodic key
  * scan always catches it (a sub-scan touchscreen tap would otherwise be missed). */
 #define BTN_MIN_HOLD_TICKS  ((timestamp_t)(TS_FREQ * 120 / 1000))   /* ~120 ms */
@@ -288,21 +293,37 @@ JNI(jboolean, nativeRestore)(JNIEnv *env, jclass clazz, jbyteArray data)
     return JNI_TRUE;
 }
 
-/* Advance ~tamaSeconds as fast as possible (speed 0), bounded by tick_counter.
- * Sound is suppressed so fast-forwarded beeps don't blast out. */
-JNI(void, nativeCatchUp)(JNIEnv *env, jclass clazz, jint tamaSeconds)
+/* Write the in-game clock (HH:MM:SS) directly. Map (StefanBauwens/Watchy P1): seconds & minutes
+ * are BCD nibble pairs (units, tens) at 0x10-0x13; the hour is a binary value split into low/high
+ * nibbles at 0x14/0x15. Loop thread (TamaLib is single-threaded). */
+static void write_game_clock(int h, int m, int s)
+{
+    if (!g_initialized || h < 0 || h > 23 || m < 0 || m > 59 || s < 0 || s > 59) return;
+    state_t *st = tamalib_get_state();
+    MEM_BUFFER_TYPE *mem = st->memory;
+    SET_MEMORY(mem, 0x10, (MEM_BUFFER_TYPE)(s % 10));
+    SET_MEMORY(mem, 0x11, (MEM_BUFFER_TYPE)(s / 10));
+    SET_MEMORY(mem, 0x12, (MEM_BUFFER_TYPE)(m % 10));
+    SET_MEMORY(mem, 0x13, (MEM_BUFFER_TYPE)(m / 10));
+    SET_MEMORY(mem, 0x14, (MEM_BUFFER_TYPE)(h & 0x0F));
+    SET_MEMORY(mem, 0x15, (MEM_BUFFER_TYPE)((h >> 4) & 0x0F));
+    LOGI("clock: in-game clock set to %02d:%02d:%02d", h, m, s);
+}
+
+/* Clock-overwrite (launch): set the in-game clock to the phone time. Called before nativeRun. */
+JNI(void, nativeSyncClock)(JNIEnv *env, jclass clazz, jint h, jint m, jint s)
 {
     (void)env; (void)clazz;
-    if (!g_initialized || tamaSeconds <= 0) return;
-    state_t *s = tamalib_get_state();
-    u32_t start  = *s->tick_counter;
-    u32_t target = (u32_t)tamaSeconds * TS_FREQ;
-    g_suppress_sound = 1;
-    tamalib_set_speed(0);
-    while ((u32_t)(*s->tick_counter - start) < target) tamalib_step();
-    tamalib_set_speed(1);
-    g_suppress_sound = 0;
-    reset_clock();
+    write_game_clock((int)h, (int)m, (int)s);
+}
+
+/* Request the running loop to set the in-game clock (toggle / periodic). The loop applies it on
+ * its own thread next step. Any thread. */
+JNI(void, nativeRequestClockSync)(JNIEnv *env, jclass clazz, jint h, jint m, jint s)
+{
+    (void)env; (void)clazz;
+    g_clock_h = (int)h; g_clock_m = (int)m; g_clock_s = (int)s;
+    g_clock_request = 1;
 }
 
 /* Blocking real-time step loop. Returns when nativeStop sets g_running = 0. */
@@ -329,6 +350,12 @@ JNI(void, nativeRun)(JNIEnv *env, jclass clazz)
 
     g_running = 1;
     while (g_running) {
+        /* Apply a pending clock-overwrite (instant, on the loop thread). */
+        if (g_clock_request) {
+            g_clock_request = 0;
+            write_game_clock(g_clock_h, g_clock_m, g_clock_s);
+        }
+
         timestamp_t now = now_ts();
 
         /* Apply buttons: latch the press edge (never miss a quick tap) and hold for
