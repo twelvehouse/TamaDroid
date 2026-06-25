@@ -50,7 +50,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -265,7 +267,15 @@ private fun WidgetSection() {
     val preview = remember(theme, fx, packed, sampleFb.contentHashCode()) {
         WidgetRenderer.render(theme, fx, sampleFb, packed).asImageBitmap()
     }
-    Image(preview, "preview", modifier = Modifier.fillMaxWidth().heightIn(max = 150.dp))
+    // Mirror the real widget: full-bleed background with the LCD inset, rounded like the launcher.
+    Box(
+        modifier = Modifier.fillMaxWidth().height(130.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color(WidgetRenderer.backgroundColor(theme))),
+        contentAlignment = Alignment.Center
+    ) {
+        Image(preview, "preview", contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize())
+    }
 
     GlowToggle(glow) { glow = it; WidgetPrefs.setEffect(ctx, if (it) LcdEffect.GLOW else LcdEffect.NONE) }
     SwitchRow("Packed dots", packed) { packed = it; WidgetPrefs.setPacked(ctx, it) }

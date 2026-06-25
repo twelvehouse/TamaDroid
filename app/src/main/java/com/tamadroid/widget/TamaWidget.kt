@@ -52,10 +52,13 @@ class TamaWidgetProvider : AppWidgetProvider() {
 
         private fun pushView(context: Context, mgr: AppWidgetManager, id: Int, fb: ByteArray?) {
             val views = RemoteViews(context.packageName, R.layout.widget_tama)
+            val theme = WidgetPrefs.theme(context)
+            // Full-bleed background on the host view so the launcher rounds the corners itself.
+            views.setInt(R.id.widget_root, "setBackgroundColor", WidgetRenderer.backgroundColor(theme))
             if (fb != null) {
                 views.setImageViewBitmap(
                     R.id.widget_lcd,
-                    WidgetRenderer.render(WidgetPrefs.theme(context), WidgetPrefs.effect(context), fb, WidgetPrefs.packed(context))
+                    WidgetRenderer.render(theme, WidgetPrefs.effect(context), fb, WidgetPrefs.packed(context))
                 )
             }
             val open = PendingIntent.getActivity(
@@ -87,30 +90,25 @@ object WidgetFrameStore {
 }
 
 /**
- * Renders the 32x16 LCD matrix to a themed bitmap with rounded corners and an optional
- * effect. Vertical margin = corner radius so the rounding never clips the (full-width)
- * LCD area. The effect is applied to the coherent frame published by the run loop — no
- * shader baking into a separate pass needed.
+ * Renders ONLY the 32x16 LCD dot matrix (transparent background) with a margin around it.
+ * The widget's themeable, optionally translucent background is drawn full-bleed on the host
+ * root view instead — so the launcher rounds the widget's corners itself (Android 12+) without
+ * clipping any LCD content. The margin keeps the LCD clear of that corner rounding.
  */
 object WidgetRenderer {
     private const val SCALE = 16
-    private const val RADIUS = SCALE * 2f      // corner radius == vertical margin
+    private const val MARGIN = SCALE * 2       // LCD inset, so rounded corners never clip it
 
     fun render(theme: WidgetTheme, effect: LcdEffect, fb: ByteArray, packed: Boolean = true): Bitmap {
-        val w = TamaCore.LCD_WIDTH * SCALE
-        val lcdH = TamaCore.LCD_HEIGHT * SCALE
-        val vMargin = RADIUS.toInt()
-        val h = lcdH + vMargin * 2
-
+        val w = TamaCore.LCD_WIDTH * SCALE + MARGIN * 2
+        val h = TamaCore.LCD_HEIGHT * SCALE + MARGIN * 2
         val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
         val c = Canvas(bmp)
-
-        val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = (theme.alpha shl 24) or (theme.bg and 0x00FFFFFF)
-        }
-        c.drawRoundRect(0f, 0f, w.toFloat(), h.toFloat(), RADIUS, RADIUS, bgPaint)
-
-        LcdFx.draw(c, fb, 0f, vMargin.toFloat(), SCALE.toFloat(), theme.dot or (0xFF shl 24), effect, LcdFx.gap(packed))
+        LcdFx.draw(c, fb, MARGIN.toFloat(), MARGIN.toFloat(), SCALE.toFloat(),
+            theme.dot or (0xFF shl 24), effect, LcdFx.gap(packed))
         return bmp
     }
+
+    /** The widget background colour (themeable, possibly translucent) for the host root view. */
+    fun backgroundColor(theme: WidgetTheme): Int = (theme.alpha shl 24) or (theme.bg and 0x00FFFFFF)
 }

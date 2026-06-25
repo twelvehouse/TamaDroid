@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -110,20 +111,26 @@ fun PlayBgEditor(onDone: () -> Unit, onCancel: () -> Unit) {
             },
         )
 
-        // Reset (top) — restores the current mode's layout to its defaults.
-        FilledTonalButton(
-            onClick = {
-                if (mode == PlayEdit.IMAGE) {
-                    offX = 0f; offY = 0f; scale = 1f
-                } else {
-                    AppPrefs.DEFAULT_BTN_POS.forEachIndexed { i, p -> positions[i] = Offset(p.first, p.second) }
-                }
-            },
+        // Mode toggle (top) — full width available here, so the labels never wrap.
+        SingleChoiceSegmentedButtonRow(
             modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 8.dp)
-        ) { Text(if (mode == PlayEdit.IMAGE) "Reset image" else "Reset buttons") }
+        ) {
+            SegmentedButton(
+                selected = mode == PlayEdit.IMAGE,
+                enabled = hasImage,
+                onClick = { mode = PlayEdit.IMAGE },
+                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                icon = {}
+            ) { Text("Image") }
+            SegmentedButton(
+                selected = mode == PlayEdit.BUTTONS,
+                onClick = { mode = PlayEdit.BUTTONS },
+                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                icon = {}
+            ) { Text("Buttons") }
+        }
 
-        // Hint + actions (bottom): Cancel | mode toggle | Confirm, so the toggle is always
-        // obvious between the two actions (a transparent unselected chip up top was easy to miss).
+        // Hint + actions (bottom): Cancel | Reset | Confirm — short labels that always fit.
         Column(
             modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()
                 .navigationBarsPadding().padding(16.dp),
@@ -145,21 +152,17 @@ fun PlayBgEditor(onDone: () -> Unit, onCancel: () -> Unit) {
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Button(onClick = onCancel) { Text("Cancel") }
-                SingleChoiceSegmentedButtonRow(modifier = Modifier.weight(1f)) {
-                    SegmentedButton(
-                        selected = mode == PlayEdit.IMAGE,
-                        enabled = hasImage,
-                        onClick = { mode = PlayEdit.IMAGE },
-                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
-                        icon = {}
-                    ) { Text("Image") }
-                    SegmentedButton(
-                        selected = mode == PlayEdit.BUTTONS,
-                        onClick = { mode = PlayEdit.BUTTONS },
-                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
-                        icon = {}
-                    ) { Text("Buttons") }
-                }
+                Spacer(Modifier.weight(1f))
+                // Reset restores the current mode's layout to its defaults.
+                FilledTonalButton(
+                    onClick = {
+                        if (mode == PlayEdit.IMAGE) {
+                            offX = 0f; offY = 0f; scale = 1f
+                        } else {
+                            AppPrefs.DEFAULT_BTN_POS.forEachIndexed { i, p -> positions[i] = Offset(p.first, p.second) }
+                        }
+                    }
+                ) { Text("Reset") }
                 Button(
                     onClick = {
                         if (hasImage) AppPrefs.setPlayImage(ctx, AppPrefs.PlayImage(offX, offY, scale))
