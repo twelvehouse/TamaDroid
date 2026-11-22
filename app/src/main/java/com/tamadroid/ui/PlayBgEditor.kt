@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -25,6 +26,7 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -46,12 +48,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tamadroid.data.AppPrefs
 import com.tamadroid.service.TamaRuntime
 import java.io.File
+import kotlin.math.roundToInt
 
 /**
  * Full-screen layout editor. Two modes share one WYSIWYG preview ([PlayArea], identical to
- * the live screen): "Move image" pans/pinches the background picture behind the device,
- * "Move buttons" drags each button so they line up with the picture. Confirm saves
- * both the image transform and the button positions.
+ * the live screen): "Image" pans/pinches the background picture and sizes the device screen,
+ * "Buttons" drags each button so they line up with the picture.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -72,12 +74,13 @@ fun PlayBgEditor(onDone: () -> Unit, onCancel: () -> Unit) {
         AppPrefs.playButtonPositions(ctx).map { Offset(it.first, it.second) }.toMutableStateList()
     }
 
-    var mode by remember { mutableStateOf(if (hasImage) PlayEdit.IMAGE else PlayEdit.BUTTONS) }
+    var screenWidth by remember { mutableFloatStateOf(AppPrefs.screenWidthFraction(ctx)) }
+
+    var mode by remember { mutableStateOf(PlayEdit.FIT) }
 
     val flow = TamaRuntime.frame
     val frame = if (flow != null) flow.collectAsStateWithLifecycle().value else null
 
-    // Animated alignment guide (blue <-> red) shown only while moving the image.
     val transition = rememberInfiniteTransition(label = "guide")
     val t by transition.animateFloat(
         0f, 1f, infiniteRepeatable(tween(900), RepeatMode.Reverse), label = "t"
@@ -100,8 +103,9 @@ fun PlayBgEditor(onDone: () -> Unit, onCancel: () -> Unit) {
             buttonColor = AppPrefs.playButtonColor(ctx, dark),
             buttonAlpha = AppPrefs.playButtonAlpha(ctx),
             buttonPositions = positions,
+            screenWidthFraction = screenWidth,
             mode = mode,
-            guideColor = if (mode == PlayEdit.IMAGE && hasImage) guide else null,
+            guideColor = if (mode == PlayEdit.FIT) guide else null,
             onImageTransform = { pan, zoom ->
                 offX += pan.x; offY += pan.y; scale = (scale * zoom).coerceIn(0.1f, 10f)
             },
@@ -115,19 +119,15 @@ fun PlayBgEditor(onDone: () -> Unit, onCancel: () -> Unit) {
         SingleChoiceSegmentedButtonRow(
             modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 8.dp)
         ) {
-            SegmentedButton(
-                selected = mode == PlayEdit.IMAGE,
-                enabled = hasImage,
-                onClick = { mode = PlayEdit.IMAGE },
-                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
-                icon = {}
-            ) { Text("Image") }
-            SegmentedButton(
-                selected = mode == PlayEdit.BUTTONS,
-                onClick = { mode = PlayEdit.BUTTONS },
-                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
-                icon = {}
-            ) { Text("Buttons") }
+            val modes = listOf(PlayEdit.FIT to (if (hasImage) "Image" else "Screen"), PlayEdit.BUTTONS to "Buttons")
+            modes.forEachIndexed { i, (m, label) ->
+                SegmentedButton(
+                    selected = mode == m,
+                    onClick = { mode = m },
+                    shape = SegmentedButtonDefaults.itemShape(index = i, count = modes.size),
+                    icon = {}
+                ) { Text(label) }
+            }
         }
 
         // Hint + actions (bottom): Cancel | Reset | Confirm — short labels that always fit.
@@ -137,7 +137,11 @@ fun PlayBgEditor(onDone: () -> Unit, onCancel: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(8.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            val hint = if (mode == PlayEdit.IMAGE) "Drag to move, pinch to scale" else "Drag each button to position it"
+            val hint = when {
+                mode == PlayEdit.BUTTONS -> "Drag each button to position it"
+                hasImage -> "Drag to move, pinch to scale the image"
+                else -> "Adjust the screen size"
+            }
             Text(
                 hint,
                 color = Color.White,
@@ -146,6 +150,30 @@ fun PlayBgEditor(onDone: () -> Unit, onCancel: () -> Unit) {
                     .background(Color(0x99000000))
                     .padding(horizontal = 12.dp, vertical = 6.dp)
             )
+            if (mode == PlayEdit.FIT) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color(0x99000000))
+                        .padding(horizontal = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text("Screen", color = Color.White)
+                    Slider(
+                        value = screenWidth,
+                        onValueChange = { screenWidth = it },
+                        valueRange = AppPrefs.MIN_SCREEN_WIDTH_FRACTION..AppPrefs.MAX_SCREEN_WIDTH_FRACTION,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Text(
+                        "${(screenWidth * 100).roundToInt()}%",
+                        color = Color.White,
+                        modifier = Modifier.widthIn(min = 44.dp)
+                    )
+                }
+            }
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -156,8 +184,8 @@ fun PlayBgEditor(onDone: () -> Unit, onCancel: () -> Unit) {
                 // Reset restores the current mode's layout to its defaults.
                 FilledTonalButton(
                     onClick = {
-                        if (mode == PlayEdit.IMAGE) {
-                            offX = 0f; offY = 0f; scale = 1f
+                        if (mode == PlayEdit.FIT) {
+                            offX = 0f; offY = 0f; scale = 1f; screenWidth = AppPrefs.MAX_SCREEN_WIDTH_FRACTION
                         } else {
                             AppPrefs.DEFAULT_BTN_POS.forEachIndexed { i, p -> positions[i] = Offset(p.first, p.second) }
                         }
@@ -167,6 +195,7 @@ fun PlayBgEditor(onDone: () -> Unit, onCancel: () -> Unit) {
                     onClick = {
                         if (hasImage) AppPrefs.setPlayImage(ctx, AppPrefs.PlayImage(offX, offY, scale))
                         AppPrefs.setPlayButtonPositions(ctx, positions.map { it.x to it.y })
+                        AppPrefs.setScreenWidthFraction(ctx, screenWidth)
                         onDone()
                     }
                 ) { Text("Confirm") }

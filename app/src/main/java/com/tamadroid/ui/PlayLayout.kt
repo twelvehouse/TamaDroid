@@ -54,7 +54,7 @@ import com.tamadroid.service.TamaRuntime
 import kotlin.math.roundToInt
 
 /** Editing state of the play area. NONE = live game (buttons are pressable). */
-enum class PlayEdit { NONE, IMAGE, BUTTONS }
+enum class PlayEdit { NONE, FIT, BUTTONS }
 
 private val BTN_SIZE = 56.dp
 
@@ -66,7 +66,7 @@ private val BTN_SIZE = 56.dp
  *    height (so the LCD keeps the same position whether buttons are below it or floating),
  *  - the three buttons as an absolute overlay at normalized positions.
  *
- * In [PlayEdit.NONE] the buttons drive the emulator; in [PlayEdit.IMAGE] area gestures
+ * In [PlayEdit.NONE] the buttons drive the emulator; in [PlayEdit.FIT] area gestures
  * pan/zoom the image (buttons are inert references); in [PlayEdit.BUTTONS] each button is
  * draggable and the image is fixed.
  */
@@ -84,6 +84,7 @@ fun PlayArea(
     buttonColor: Int,
     buttonAlpha: Int,
     buttonPositions: List<Offset>,
+    screenWidthFraction: Float = AppPrefs.MAX_SCREEN_WIDTH_FRACTION,
     mode: PlayEdit = PlayEdit.NONE,
     guideColor: Color? = null,
     onImageTransform: (pan: Offset, zoom: Float) -> Unit = { _, _ -> },
@@ -99,7 +100,7 @@ fun PlayArea(
             .background(Color(bgColor))
             .onSizeChanged { areaSize = it }
             .then(
-                if (mode == PlayEdit.IMAGE)
+                if (mode == PlayEdit.FIT)
                     Modifier.pointerInput(Unit) {
                         detectTransformGestures { _, pan, zoom, _ -> onImageTransform(pan, zoom) }
                     }
@@ -136,7 +137,7 @@ fun PlayArea(
                     allIcons = mode != PlayEdit.NONE,   // editor: show every icon for clarity
                     guideColor = guideColor,
                     packed = packed,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(screenWidthFraction)
                 )
             }
             Spacer(Modifier.height(BTN_SIZE))
@@ -195,7 +196,7 @@ private fun PlayButton(
             .pointerInput(btn) {
                 detectDragGestures { change, drag -> change.consume(); onDrag(drag) }
             }
-        PlayEdit.IMAGE -> base   // inert reference; gestures fall through to the image
+        PlayEdit.FIT -> base   // inert reference; gestures fall through to the image
     }
     Box(styled)
 }

@@ -152,7 +152,7 @@ private fun PlaySection(onEditImage: () -> Unit) {
     ColorSwatchButton("Button color", btnColor) { btnColor = it; AppPrefs.setPlayButtonColor(ctx, it) }
     OpacitySlider("Button opacity", btnAlpha) { btnAlpha = it; AppPrefs.setPlayButtonAlpha(ctx, it) }
 
-    OutlinedButton(onClick = onEditImage) { Text("Edit button layout") }
+    OutlinedButton(onClick = onEditImage) { Text("Edit layout (screen size & buttons)") }
 }
 
 @Composable

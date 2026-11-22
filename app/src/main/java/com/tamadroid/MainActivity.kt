@@ -249,6 +249,7 @@ private fun EmulatorScreen(onOpenSettings: () -> Unit) {
             buttonColor = AppPrefs.playButtonColor(ctx, dark),
             buttonAlpha = AppPrefs.playButtonAlpha(ctx),
             buttonPositions = positions,
+            screenWidthFraction = AppPrefs.screenWidthFraction(ctx),
             mode = PlayEdit.NONE,
         )
         FloatingActionButton(

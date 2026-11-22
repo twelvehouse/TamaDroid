@@ -25,6 +25,7 @@ object AppPrefs {
     private const val K_PLAY_OFFX = "play_off_x"
     private const val K_PLAY_OFFY = "play_off_y"
     private const val K_PLAY_SCALE = "play_scale"
+    private const val K_SCREEN_WIDTH_FRACTION = "lcd_scale"
     private const val K_VIBRATE = "vibrate"
     private const val K_CLOCK_OVERWRITE = "clock_overwrite"  // stamp in-game clock with phone time
 
@@ -42,6 +43,9 @@ object AppPrefs {
 
     /** Play-screen background image transform (px offset + scale), or null if no image. */
     data class PlayImage(val offsetX: Float, val offsetY: Float, val scale: Float)
+
+    const val MIN_SCREEN_WIDTH_FRACTION = 0.3f
+    const val MAX_SCREEN_WIDTH_FRACTION = 1f
 
     const val DEFAULT_PLAY_BTN_ALPHA = 255
 
@@ -165,6 +169,12 @@ object AppPrefs {
             .putFloat(K_PLAY_OFFY, img.offsetY)
             .putFloat(K_PLAY_SCALE, img.scale)
             .apply()
+    }
+
+    fun screenWidthFraction(ctx: Context): Float =
+        p(ctx).getFloat(K_SCREEN_WIDTH_FRACTION, MAX_SCREEN_WIDTH_FRACTION).coerceIn(MIN_SCREEN_WIDTH_FRACTION, MAX_SCREEN_WIDTH_FRACTION)
+    fun setScreenWidthFraction(ctx: Context, s: Float) {
+        p(ctx).edit().putFloat(K_SCREEN_WIDTH_FRACTION, s.coerceIn(MIN_SCREEN_WIDTH_FRACTION, MAX_SCREEN_WIDTH_FRACTION)).apply()
     }
 
     fun clearPlayImage(ctx: Context) {
